@@ -11,7 +11,9 @@
  *   - Run from the repository root
  *
  * Idempotent: safe to re-run. Checks for existing milestones/issues before creating.
- * Saves mapping to _bmad-output/implementation-artifacts/github-issue-map.json
+ * Saves mapping to <output_folder>/implementation-artifacts/github-issue-map.json
+ *
+ * Reads BMAD's output_folder from _bmad/bmm/config.yaml (falls back to '_bmad-output').
  */
 
 import { execFileSync } from 'node:child_process';
@@ -21,9 +23,38 @@ import { fileURLToPath } from 'node:url';
 
 const DRY_RUN = process.argv.includes('--dry-run');
 const ROOT = process.cwd();
-const EPICS_PATH = join(ROOT, '_bmad-output/planning-artifacts/epics.md');
-const SPRINT_STATUS_PATH = join(ROOT, '_bmad-output/implementation-artifacts/sprint-status.yaml');
-const MAP_PATH = join(ROOT, '_bmad-output/implementation-artifacts/github-issue-map.json');
+
+// --- BMAD config resolution -----------------------------------------------
+
+const DEFAULT_OUTPUT_FOLDER = '_bmad-output';
+
+/**
+ * Read BMAD's output_folder from the BMM module config.
+ * Checks _bmad/bmm/config.yaml for an output_folder key.
+ * Falls back to '_bmad-output' if not found.
+ */
+function resolveBmadOutputFolder(root) {
+  const configPath = join(root, '_bmad/bmm/config.yaml');
+  try {
+    const content = readFileSync(configPath, 'utf-8');
+    // Match "output_folder: <value>" — handles quoted and unquoted values,
+    // and resolves {project-root} placeholder to the actual root.
+    const match = content.match(/^output_folder:\s*['"]?(.+?)['"]?\s*$/m);
+    if (match) {
+      const raw = match[1].replace(/\{project-root\}/g, root);
+      // If the resolved value is absolute, use it directly; otherwise join with root
+      return raw.startsWith('/') ? raw : join(root, raw);
+    }
+  } catch {
+    // Config file doesn't exist or isn't readable — use default
+  }
+  return join(root, DEFAULT_OUTPUT_FOLDER);
+}
+
+const OUTPUT_FOLDER = resolveBmadOutputFolder(ROOT);
+const EPICS_PATH = join(OUTPUT_FOLDER, 'planning-artifacts/epics.md');
+const SPRINT_STATUS_PATH = join(OUTPUT_FOLDER, 'implementation-artifacts/sprint-status.yaml');
+const MAP_PATH = join(OUTPUT_FOLDER, 'implementation-artifacts/github-issue-map.json');
 
 // --- Helpers -----------------------------------------------------------
 
@@ -493,7 +524,7 @@ function createIssues(stories, doneStories, milestoneMap) {
 
 function saveIssueMap(issueMap) {
   console.log('\n--- Saving issue map ---');
-  const dir = join(ROOT, '_bmad-output/implementation-artifacts');
+  const dir = join(OUTPUT_FOLDER, 'implementation-artifacts');
   mkdirSync(dir, { recursive: true });
 
   // Atomic write: write to .tmp then rename
@@ -606,4 +637,4 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   }
 }
 
-export { parseEpics, parseDoneStories, classifyStory, buildIssueBody, gh };
+export { parseEpics, parseDoneStories, classifyStory, buildIssueBody, gh, resolveBmadOutputFolder };

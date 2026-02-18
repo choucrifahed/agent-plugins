@@ -95,9 +95,9 @@ Work in two phases: **A (Portability + Robustness)** first, then **B (Ecosystem 
 
 `_bmad-output` is hardcoded 37 times across 7 files. BMAD's global config exposes `output_folder` (default: `_bmad-output`).
 
-- [ ] **Script:** In `sync-stories-to-github.mjs`, read BMAD config at startup to resolve `output_folder`. Fall back to `_bmad-output` if no config found.
-- [ ] **Commands:** In all 5 command files, add a pre-step: "Read `_bmad/bmad.config.yaml` and resolve `output_folder`. If not found, default to `_bmad-output`." Replace all hardcoded `_bmad-output` references with the resolved path.
-- [ ] **Tests:** Update tests to cover both default and custom `output_folder` scenarios.
+- [x] **Script:** In `sync-stories-to-github.mjs`, added `resolveBmadOutputFolder()` that reads `_bmad/bmm/config.yaml` and resolves `output_folder`. Falls back to `_bmad-output`.
+- [x] **Commands:** Replaced all hardcoded `_bmad-output` references with `<output_folder>` in all 5 command files. Resolution instructions moved to a SessionStart hook (`hooks/scripts/session-start.sh`) to avoid repetition.
+- [x] **Tests:** 6 new tests covering default fallback, config reading, `{project-root}` interpolation, quoted values, missing key, and absolute paths.
 
 #### A2. Force-Close Detection in `/story-sync`
 

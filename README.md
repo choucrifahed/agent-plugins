@@ -21,7 +21,8 @@ milestones and PRs. These are concerns that BMAD's module system isn't designed 
 - [Claude Code](https://claude.com/claude-code) installed
 - [`gh` CLI](https://cli.github.com/) installed and authenticated (`gh auth login`)
 - [Node.js](https://nodejs.org/) (for the batch sync script)
-- A project using the [BMAD Method](https://bmad-builder-docs.bmad-method.org/) with `_bmad/` and `_bmad-output/` directories
+- A project using the [BMAD Method](https://bmad-builder-docs.bmad-method.org/) with `_bmad/` directory (output folder is read from `_bmad/bmm/config.yaml`, 
+  defaults to `_bmad-output/`)
 
 ### Installation
 
@@ -81,9 +82,14 @@ worktree-root: ../my-project-worktrees/
 
 This file is auto-created on first run of `/story-dev` or `/story-sync`.
 
+#### BMAD Output Folder
+
+The plugin reads the BMAD output folder from `_bmad/bmm/config.yaml` (`output_folder` key). If no config is found, it
+defaults to `_bmad-output`. This makes the plugin portable across different BMAD setups.
+
 ### Epics → Milestones
 
-Each BMAD epic from `_bmad-output/planning-artifacts/epics.md` becomes a GitHub milestone titled `Epic <N>: <Title>` 
+Each BMAD epic from `<output_folder>/planning-artifacts/epics.md` becomes a GitHub milestone titled `Epic <N>: <Title>` 
 (e.g., `Epic 1: Core Infrastructure`). Creation is idempotent — existing milestones are skipped. Every story issue is 
 assigned to the milestone matching its epic number.
 
@@ -114,7 +120,7 @@ When `/story-dev` creates a PR, it inspects the diff and adds labels for detecte
 | `*.css`, `*.scss` | `css` |
 | `*.html` | `html` |
 | `.github/**` | `github_actions` |
-| `*.md` (excluding `_bmad-output/`) | `documentation` |
+| `*.md` (excluding `<output_folder>/`) | `documentation` |
 | `package.json`, `pnpm-lock.yaml` | `dependencies` |
 | `*.test.ts`, `*.test.js`, `__tests__/**` | `qa` |
 

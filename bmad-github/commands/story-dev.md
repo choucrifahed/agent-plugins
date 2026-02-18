@@ -36,7 +36,7 @@ If sync made changes, push them before proceeding.
 ## Phase 1: Verify Story
 
 1. **Determine the next story:**
-   Read `_bmad-output/implementation-artifacts/sprint-status.yaml` and find the next story with status `ready-for-dev` (this is the BMAD status set by the create-story workflow).
+   Read `<output_folder>/implementation-artifacts/sprint-status.yaml` and find the next story with status `ready-for-dev` (this is the BMAD status set by the create-story workflow).
 
    If no story has `ready-for-dev` status, STOP and tell the user:
    ```
@@ -44,7 +44,7 @@ If sync made changes, push them before proceeding.
    ```
 
 2. **Find the story file:**
-   Look for a matching story file in `_bmad-output/implementation-artifacts/` using the story key.
+   Look for a matching story file in `<output_folder>/implementation-artifacts/` using the story key.
 
    If the file doesn't exist, STOP and tell the user:
    ```
@@ -53,12 +53,12 @@ If sync made changes, push them before proceeding.
 
 3. **Verify the story file is committed:**
    ```
-   git status --porcelain _bmad-output/implementation-artifacts/
+   git status --porcelain <output_folder>/implementation-artifacts/
    ```
    If the story file or sprint-status.yaml has uncommitted changes, STOP and tell the user:
    ```
    Story file has uncommitted changes. Please commit and push first:
-     git add _bmad-output/implementation-artifacts/
+     git add <output_folder>/implementation-artifacts/
      git commit -m "chore(story): create story <story_id> - <story_key>"
      git push
    Then re-run /story-dev.
@@ -115,7 +115,7 @@ Store the resolved path as `<worktree-root>`.
 
 ### Step 2: Update status to in-progress
 
-Look up the issue number from `_bmad-output/implementation-artifacts/github-issue-map.json` using the story ID.
+Look up the issue number from `<output_folder>/implementation-artifacts/github-issue-map.json` using the story ID.
 
 **Update GitHub issue label:**
 ```
@@ -123,14 +123,14 @@ gh issue edit <number> --remove-label "status:backlog" --remove-label "status:re
 ```
 
 **Update sprint-status.yaml locally:**
-Edit `_bmad-output/implementation-artifacts/sprint-status.yaml` and change the story's status from `ready-for-dev` to `in-progress`.
+Edit `<output_folder>/implementation-artifacts/sprint-status.yaml` and change the story's status from `ready-for-dev` to `in-progress`.
 
 ### Step 3: Commit and push status update on main
 
 Commit the local status change on the main branch **before** creating the worktree, so the worktree starts from a clean, up-to-date main:
 
 ```
-git add _bmad-output/implementation-artifacts/sprint-status.yaml
+git add <output_folder>/implementation-artifacts/sprint-status.yaml
 git commit -m "chore(story): mark <story_id> in-progress"
 git push
 ```
@@ -229,7 +229,7 @@ git push -u origin story/<story_key>
 ```
 
 ### Step 2: Look up the GitHub issue number
-Read `_bmad-output/implementation-artifacts/github-issue-map.json` and find the entry for this story's ID (e.g., `1-2`).
+Read `<output_folder>/implementation-artifacts/github-issue-map.json` and find the entry for this story's ID (e.g., `1-2`).
 
 ### Step 3: Build the label set
 
@@ -252,7 +252,7 @@ Apply these rules to the list of changed files:
 - `*.css` or `*.scss` → `css`
 - `*.html` → `html`
 - `.github/**` → `github_actions`
-- `*.md` (excluding `_bmad-output/**`) → `documentation`
+- `*.md` (excluding `<output_folder>/**`) → `documentation`
 - `package.json` or `pnpm-lock.yaml` changes → `dependencies`
 - `*.test.ts` or `*.test.js` or `__tests__/**` → `qa`
 

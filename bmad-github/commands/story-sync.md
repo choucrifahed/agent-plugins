@@ -55,12 +55,12 @@ Store the resolved path as `<worktree-root>` for use in Phase 3 below.
 ## Phase 1: Read Current State
 
 1. **Read the GitHub issue map:**
-   Read `_bmad-output/implementation-artifacts/github-issue-map.json`
+   Read `<output_folder>/implementation-artifacts/github-issue-map.json`
    - This maps story keys (e.g., `"1-2"`) to GitHub issue numbers and URLs
    - If the file doesn't exist, tell the user to run `/story-init` first
 
 2. **Read sprint-status.yaml:**
-   Read `_bmad-output/implementation-artifacts/sprint-status.yaml`
+   Read `<output_folder>/implementation-artifacts/sprint-status.yaml`
    - Parse the current BMAD status for each story
 
 3. **Query GitHub for each mapped issue's state:**
@@ -78,8 +78,8 @@ For each story where **GitHub issue is CLOSED** but **BMAD status is NOT `done`*
    - Find the line matching this story's key pattern (e.g., `1-2-bridge-interface-and-shared-type-contracts`)
    - Change its status from whatever it currently is to `done`
 
-2. **Update the story file** (if it exists in `_bmad-output/implementation-artifacts/`):
-   - Glob for `_bmad-output/implementation-artifacts/<key>-*.md` (e.g., `1-4-*.md` for story key `1-4`)
+2. **Update the story file** (if it exists in `<output_folder>/implementation-artifacts/`):
+   - Glob for `<output_folder>/implementation-artifacts/<key>-*.md` (e.g., `1-4-*.md` for story key `1-4`)
    - If a matching file is found, find the line that starts with `Status:` near the top of the file (typically line 3) and change it to `Status: done`
    - Example: change `Status: review` to `Status: done`
    - **This step is REQUIRED** — do not skip it. Story files must stay in sync with sprint-status.yaml.
@@ -125,8 +125,8 @@ If so, update the epic status to `done` as well.
 
 1. **If any BMAD files were updated**, commit the changes:
    ```
-   git add _bmad-output/implementation-artifacts/sprint-status.yaml
-   git add _bmad-output/implementation-artifacts/*.md
+   git add <output_folder>/implementation-artifacts/sprint-status.yaml
+   git add <output_folder>/implementation-artifacts/*.md
    git commit -m "chore(sync): mark stories done from merged PRs"
    git push
    ```

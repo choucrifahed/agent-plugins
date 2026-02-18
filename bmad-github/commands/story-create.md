@@ -48,7 +48,7 @@ After the workflow completes, note:
 - The **story ID** (e.g., `1-2`)
 - The **story key/slug** from the story file name (e.g., `1-2-bridge-interface-and-shared-type-contracts`)
 - The **story title** (e.g., `Bridge Interface & Shared Type Contracts`)
-- The **story file path** in `_bmad-output/implementation-artifacts/`
+- The **story file path** in `<output_folder>/implementation-artifacts/`
 
 ---
 
@@ -101,7 +101,7 @@ After the BMAD workflow completes and the story file is saved, determine whether
 
 ### Step 1: Update GitHub issue label
 
-Look up the issue number from `_bmad-output/implementation-artifacts/github-issue-map.json` using the story ID (e.g., `1-2`).
+Look up the issue number from `<output_folder>/implementation-artifacts/github-issue-map.json` using the story ID (e.g., `1-2`).
 
 ```
 gh issue edit <number> --remove-label "status:backlog" --add-label "status:ready"
@@ -115,13 +115,13 @@ Print a clear summary:
 === Story Planned ===
 
 Story:     <story_id> - <story_title>
-File:      _bmad-output/implementation-artifacts/<story-file>.md
+File:      <output_folder>/implementation-artifacts/<story-file>.md
 Issue:     #<number> (<url>) — status:ready
 
 Next steps:
   1. Review the story file and make any edits you want
   2. Commit and push when you're happy:
-     git add _bmad-output/implementation-artifacts/
+     git add <output_folder>/implementation-artifacts/
      git commit -m "chore(story): create story <story_id> - <story_key>"
      git push
   3. Run /story-dev to create a worktree and start implementation

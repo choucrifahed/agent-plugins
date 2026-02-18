@@ -24,7 +24,7 @@ You are performing an adversarial code review on a story. This command runs the 
 
    If the branch doesn't match the `story/` pattern, STOP and tell the user this command must be run from a story worktree.
 
-2. **Find the story file** in `_bmad-output/implementation-artifacts/` matching the story key.
+2. **Find the story file** in `<output_folder>/implementation-artifacts/` matching the story key.
 
 3. **Verify a PR exists for this branch:**
    ```

@@ -28,8 +28,8 @@ This is **idempotent** — safe to re-run. It checks for existing milestones/iss
    Confirm the path matches the main repo root.
 
 3. **Verify BMAD files exist:**
-   - `_bmad-output/planning-artifacts/epics.md` — the source of truth for epics and stories
-   - `_bmad-output/implementation-artifacts/sprint-status.yaml` — tracks story statuses
+   - `<output_folder>/planning-artifacts/epics.md` — the source of truth for epics and stories
+   - `<output_folder>/implementation-artifacts/sprint-status.yaml` — tracks story statuses
 
    If either file is missing, STOP and tell the user which file is needed.
 
@@ -59,7 +59,7 @@ The script will:
 - Create GitHub Milestones for each epic (if they don't exist)
 - Create GitHub Labels (type labels per story + `status:*` status labels)
 - Create GitHub Issues for each story (if they don't exist)
-- Save the issue map to `_bmad-output/implementation-artifacts/github-issue-map.json`
+- Save the issue map to `<output_folder>/implementation-artifacts/github-issue-map.json`
 
 Watch the output for any errors.
 
@@ -71,12 +71,12 @@ If the script ran successfully (not `--dry-run`):
 
 1. **Stage the issue map:**
    ```
-   git add _bmad-output/implementation-artifacts/github-issue-map.json
+   git add <output_folder>/implementation-artifacts/github-issue-map.json
    ```
 
 2. **Check if there are changes to commit:**
    ```
-   git status --porcelain _bmad-output/implementation-artifacts/github-issue-map.json
+   git status --porcelain <output_folder>/implementation-artifacts/github-issue-map.json
    ```
 
 3. **If there are changes, commit and push:**
@@ -96,7 +96,7 @@ Print a summary:
 
 Milestones: <count> epics synced
 Issues:     <count> stories synced
-Map:        _bmad-output/implementation-artifacts/github-issue-map.json
+Map:        <output_folder>/implementation-artifacts/github-issue-map.json
 
 Next steps:
   1. Run /story-create to pick a story and start development

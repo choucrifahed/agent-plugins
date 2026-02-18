@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock child_process before importing the module under test
 vi.mock('node:child_process', () => ({
@@ -6,12 +6,16 @@ vi.mock('node:child_process', () => ({
 }));
 
 import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   buildIssueBody,
   classifyStory,
   gh,
   parseDoneStories,
   parseEpics,
+  resolveBmadOutputFolder,
 } from '../../bmad-github/scripts/sync-stories-to-github.mjs';
 
 // ---------------------------------------------------------------------------
@@ -474,5 +478,64 @@ describe('gh', () => {
       readOnly: true,
     });
     expect(result).toEqual({ number: 42, url: 'https://example.com' });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolveBmadOutputFolder
+// ---------------------------------------------------------------------------
+
+describe('resolveBmadOutputFolder', () => {
+  let tempDir;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'bmad-test-'));
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('returns default when no config file exists', () => {
+    const result = resolveBmadOutputFolder(tempDir);
+    expect(result).toBe(join(tempDir, '_bmad-output'));
+  });
+
+  it('reads output_folder from config.yaml', () => {
+    mkdirSync(join(tempDir, '_bmad/bmm'), { recursive: true });
+    writeFileSync(join(tempDir, '_bmad/bmm/config.yaml'), 'output_folder: docs\n');
+    const result = resolveBmadOutputFolder(tempDir);
+    expect(result).toBe(join(tempDir, 'docs'));
+  });
+
+  it('resolves {project-root} placeholder', () => {
+    mkdirSync(join(tempDir, '_bmad/bmm'), { recursive: true });
+    writeFileSync(
+      join(tempDir, '_bmad/bmm/config.yaml'),
+      'output_folder: "{project-root}/custom-output"\n',
+    );
+    const result = resolveBmadOutputFolder(tempDir);
+    expect(result).toBe(join(tempDir, 'custom-output'));
+  });
+
+  it('handles quoted values', () => {
+    mkdirSync(join(tempDir, '_bmad/bmm'), { recursive: true });
+    writeFileSync(join(tempDir, '_bmad/bmm/config.yaml'), "output_folder: 'my-output'\n");
+    const result = resolveBmadOutputFolder(tempDir);
+    expect(result).toBe(join(tempDir, 'my-output'));
+  });
+
+  it('returns default when config exists but has no output_folder key', () => {
+    mkdirSync(join(tempDir, '_bmad/bmm'), { recursive: true });
+    writeFileSync(join(tempDir, '_bmad/bmm/config.yaml'), 'user_name: test\n');
+    const result = resolveBmadOutputFolder(tempDir);
+    expect(result).toBe(join(tempDir, '_bmad-output'));
+  });
+
+  it('handles absolute path in output_folder', () => {
+    mkdirSync(join(tempDir, '_bmad/bmm'), { recursive: true });
+    writeFileSync(join(tempDir, '_bmad/bmm/config.yaml'), 'output_folder: /absolute/path\n');
+    const result = resolveBmadOutputFolder(tempDir);
+    expect(result).toBe('/absolute/path');
   });
 });
