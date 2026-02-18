@@ -1,0 +1,23 @@
+{
+  "name": "agent-plugins",
+  "owner": {
+    "name": "Choucri Fahed"
+  },
+  "metadata": {
+    "description": "Claude Code plugins for agent-driven development workflows"
+  },
+  "plugins": [
+    {
+      "name": "bmad-github",
+      "source": "./bmad-github",
+      "description": "BMAD + GitHub story workflow with git worktrees for parallel agent development",
+      "version": "0.1.0",
+      "author": {
+        "name": "Choucri Fahed"
+      },
+      "repository": "https://github.com/choucrifahed/agent-plugins",
+      "license": "MIT",
+      "keywords": ["bmad", "github", "stories", "worktrees", "project-management"]
+    }
+  ]
+}
