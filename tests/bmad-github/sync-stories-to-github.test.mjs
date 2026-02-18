@@ -230,6 +230,28 @@ describe('parseDoneStories', () => {
     expect(done.size).toBe(0);
   });
 
+  it('extracts bare-key done stories (no slug)', () => {
+    const yaml = [
+      'sprint-1:',
+      '  stories:',
+      '  1-1: done',
+      '  2-1: done',
+      '  1-2: in-progress',
+    ].join('\n');
+    const done = parseDoneStories(yaml);
+    expect(done).toEqual(new Set(['1-1', '2-1']));
+  });
+
+  it('handles mixed bare-key and slug formats', () => {
+    const yaml = [
+      'sprint-1:',
+      '  1-1-setup-project: done',
+      '  2-1: done',
+    ].join('\n');
+    const done = parseDoneStories(yaml);
+    expect(done).toEqual(new Set(['1-1', '2-1']));
+  });
+
   it('returns empty set for empty content', () => {
     expect(parseDoneStories('').size).toBe(0);
   });
@@ -437,6 +459,14 @@ describe('gh', () => {
       ['issue', 'create', '--body-file', '-'],
       expect.objectContaining({ input: 'body content' }),
     );
+  });
+
+  it('throws descriptive error when JSON parsing fails', () => {
+    execFileSync.mockReturnValue('<html>502 Bad Gateway</html>');
+    expect(() => gh(['api', 'repos/{owner}/{repo}/milestones'], { json: true, readOnly: true }))
+      .toThrow(/Failed to parse JSON/);
+    expect(() => gh(['api', 'repos/{owner}/{repo}/milestones'], { json: true, readOnly: true }))
+      .toThrow(/502 Bad Gateway/);
   });
 
   it('handles JSON objects (not just arrays)', () => {
