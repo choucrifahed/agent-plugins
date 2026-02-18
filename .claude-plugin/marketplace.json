@@ -1,5 +1,5 @@
 {
-  "name": "agent-plugins",
+  "name": "cfahed",
   "owner": {
     "name": "Choucri Fahed"
   },
@@ -11,13 +11,13 @@
       "name": "bmad-github",
       "source": "./bmad-github",
       "description": "BMAD + GitHub story workflow with git worktrees for parallel agent development",
-      "version": "0.1.0",
+      "version": "1.0.0",
       "author": {
         "name": "Choucri Fahed"
       },
       "repository": "https://github.com/choucrifahed/agent-plugins",
       "license": "MIT",
-      "keywords": ["bmad", "github", "stories", "worktrees", "project-management"]
+      "keywords": ["bmad", "github", "stories", "worktrees", "project-management", "issues", "milestones", "labels"]
     }
   ]
 }
