@@ -15,71 +15,40 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync, mkdirSync, unlinkSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const DRY_RUN = process.argv.includes('--dry-run');
 const ROOT = process.cwd();
 const EPICS_PATH = join(ROOT, '_bmad-output/planning-artifacts/epics.md');
-const SPRINT_STATUS_PATH = join(
-  ROOT,
-  '_bmad-output/implementation-artifacts/sprint-status.yaml',
-);
-const MAP_PATH = join(
-  ROOT,
-  '_bmad-output/implementation-artifacts/github-issue-map.json',
-);
+const SPRINT_STATUS_PATH = join(ROOT, '_bmad-output/implementation-artifacts/sprint-status.yaml');
+const MAP_PATH = join(ROOT, '_bmad-output/implementation-artifacts/github-issue-map.json');
 
 // --- Helpers -----------------------------------------------------------
 
-function gh(args, { json = false, ignoreError = false } = {}) {
-  const argList = splitArgs(args);
+/**
+ * Run a `gh` CLI command. Args must be an array — no string interpolation,
+ * no shell interpretation, no quoting hazards.
+ */
+function gh(argList, { json = false, ignoreError = false, readOnly = false, input } = {}) {
   const desc = argList.join(' ');
 
-  const isReadOnly =
-    argList[0] === 'api' ||
-    argList[0] === 'issue' && argList[1] === 'list' ||
-    argList[0] === 'label' && argList[1] === 'list';
-
-  if (DRY_RUN && !isReadOnly) {
+  if (DRY_RUN && !readOnly) {
     console.log(`[dry-run] gh ${desc}`);
-    return json ? [] : '';
+    return json ? null : '';
   }
   try {
     const out = execFileSync('gh', argList, {
       encoding: 'utf-8',
+      input,
       stdio: ['pipe', 'pipe', 'pipe'],
     }).trim();
-    return json ? (out ? JSON.parse(out) : []) : out;
+    return json ? (out ? JSON.parse(out) : null) : out;
   } catch (err) {
-    if (ignoreError) return json ? [] : '';
+    if (ignoreError) return json ? null : '';
     throw new Error(`gh command failed: gh ${desc}\n${err.stderr || err.message}`);
   }
-}
-
-/** Split a command string into an args array, respecting quotes. */
-function splitArgs(str) {
-  const args = [];
-  let current = '';
-  let inQuote = null;
-  for (const ch of str) {
-    if (inQuote) {
-      if (ch === inQuote) {
-        inQuote = null;
-      } else {
-        current += ch;
-      }
-    } else if (ch === '"' || ch === "'") {
-      inQuote = ch;
-    } else if (ch === ' ') {
-      if (current) args.push(current);
-      current = '';
-    } else {
-      current += ch;
-    }
-  }
-  if (current) args.push(current);
-  return args;
 }
 
 // --- Parse epics.md ----------------------------------------------------
@@ -88,7 +57,7 @@ function parseEpics(content) {
   const epics = [];
   const stories = [];
 
-  let currentEpic = null;
+  let _currentEpic = null;
   let currentStory = null;
   let inAcceptanceCriteria = false;
   const lines = content.split('\n');
@@ -99,18 +68,17 @@ function parseEpics(content) {
     // Epic header: "## Epic N: Title" or "### Epic N: Title" (list section)
     const epicMatch = line.match(/^#{2,3} Epic (\d+): (.+)$/);
     if (epicMatch) {
-      // Push any in-progress story before switching epic context
       if (currentStory) {
         stories.push(currentStory);
         currentStory = null;
       }
       const epicNum = parseInt(epicMatch[1], 10);
-      if (!epics.find((e) => e.number === epicNum)) {
-        currentEpic = { number: epicNum, title: epicMatch[2].trim() };
-        epics.push(currentEpic);
-      } else {
-        currentEpic = epics.find((e) => e.number === epicNum);
+      let existing = epics.find((e) => e.number === epicNum);
+      if (!existing) {
+        existing = { number: epicNum, title: epicMatch[2].trim() };
+        epics.push(existing);
       }
+      _currentEpic = existing;
       inAcceptanceCriteria = false;
       continue;
     }
@@ -147,10 +115,7 @@ function parseEpics(content) {
     }
 
     // Acceptance criteria section
-    if (
-      line.match(/^\*\*Acceptance Criteria/i) ||
-      line.match(/^#### Acceptance Criteria/i)
-    ) {
+    if (line.match(/^\*\*Acceptance Criteria/i) || line.match(/^#### Acceptance Criteria/i)) {
       inAcceptanceCriteria = true;
       continue;
     }
@@ -169,7 +134,7 @@ function parseEpics(content) {
     if (inAcceptanceCriteria && line.match(/^\*\*(?:When|Then|And)\*\*/)) {
       const last = currentStory.acceptanceCriteria.length - 1;
       if (last >= 0) {
-        currentStory.acceptanceCriteria[last] += '\n' + line.trim();
+        currentStory.acceptanceCriteria[last] += `\n${line.trim()}`;
       } else {
         currentStory.acceptanceCriteria.push(line.trim());
       }
@@ -187,7 +152,6 @@ function parseEpics(content) {
     const nfrMatch = line.match(/\*\*NFRs? addressed:\*\*\s*(.+)/i);
     if (nfrMatch) {
       currentStory.nfrs.push(nfrMatch[1].trim());
-      continue;
     }
   }
 
@@ -206,34 +170,53 @@ function parseDoneStories(sprintContent) {
   return done;
 }
 
-// --- Create Milestones -------------------------------------------------
+// --- Fetch milestones --------------------------------------------------
 
-function getExistingMilestones() {
-  try {
-    const milestones = gh(
-      'api repos/{owner}/{repo}/milestones?state=all --paginate',
-      { json: true },
+function fetchMilestones() {
+  const milestones = gh(['api', 'repos/{owner}/{repo}/milestones?state=all', '--paginate'], {
+    json: true,
+    readOnly: true,
+  });
+  if (!Array.isArray(milestones)) {
+    throw new Error(
+      `Expected array of milestones from API, got ${typeof milestones}. ` +
+        'This may indicate a pagination or authentication issue.',
     );
-    return milestones.map((m) => m.title);
-  } catch {
-    return [];
   }
+  return milestones;
 }
+
+function buildMilestoneMap() {
+  if (DRY_RUN) return new Map();
+  const milestones = fetchMilestones();
+  const map = new Map();
+  for (const m of milestones) {
+    const match = m.title.match(/^Epic (\d+):/);
+    if (match) map.set(parseInt(match[1], 10), m.title);
+  }
+  return map;
+}
+
+// --- Create Milestones -------------------------------------------------
 
 function createMilestones(epics) {
   console.log('\n--- Milestones ---');
-  const existing = DRY_RUN ? [] : getExistingMilestones();
+
+  let existingTitles = [];
+  if (!DRY_RUN) {
+    existingTitles = fetchMilestones().map((m) => m.title);
+  }
 
   for (const epic of epics) {
     const title = `Epic ${epic.number}: ${epic.title}`;
-    if (existing.includes(title)) {
+    if (existingTitles.includes(title)) {
       console.log(`  [exists] ${title}`);
       continue;
     }
     if (DRY_RUN) {
       console.log(`  [dry-run] Would create milestone: ${title}`);
     } else {
-      gh(`api repos/{owner}/{repo}/milestones -f title="${title}" -f state=open`);
+      gh(['api', 'repos/{owner}/{repo}/milestones', '-f', `title=${title}`, '-f', 'state=open']);
       console.log(`  [created] ${title}`);
     }
   }
@@ -292,59 +275,77 @@ function createLabels() {
     if (DRY_RUN) {
       console.log(`  [dry-run] Would create label: ${label.name}`);
     } else {
-      gh(
-        `label create "${label.name}" --color "${label.color}" --description "${label.desc}" --force`,
-        { ignoreError: true },
-      );
-      console.log(`  [ok] ${label.name}`);
+      try {
+        gh([
+          'label',
+          'create',
+          label.name,
+          '--color',
+          label.color,
+          '--description',
+          label.desc,
+          '--force',
+        ]);
+        console.log(`  [ok] ${label.name}`);
+      } catch (err) {
+        console.warn(`  [warn] Failed to create label "${label.name}": ${err.message}`);
+      }
     }
   }
 }
 
 // --- Create Issues -----------------------------------------------------
 
-function getMilestoneTitle(epicNumber) {
-  const milestones = gh('api repos/{owner}/{repo}/milestones?state=all --paginate', {
-    json: true,
-  });
-  const prefix = `Epic ${epicNumber}:`;
-  const milestone = milestones.find((m) => m.title.startsWith(prefix));
-  return milestone ? milestone.title : null;
-}
-
 function getExistingIssueForStory(storyKey, issueMap) {
   // Check the issue map first
-  if (issueMap[storyKey] && issueMap[storyKey].number) {
+  if (issueMap[storyKey]?.number) {
     const num = issueMap[storyKey].number;
-    const issue = gh(
-      `issue view ${num} --json number,url,state`,
-      { json: true, ignoreError: true },
-    );
-    if (issue && issue.number) return issue;
+    const issue = gh(['issue', 'view', String(num), '--json', 'number,url,state'], {
+      json: true,
+      ignoreError: true,
+    });
+    if (issue?.number) return issue;
   }
 
-  // Fall back to title search
-  const epicNum = storyKey.split('-')[0];
-  const storyNum = storyKey.split('-')[1];
+  // Fall back to title search with validation
+  const [epicNum, storyNum] = storyKey.split('-');
+  if (!epicNum || !storyNum) {
+    console.warn(`  [warn] Malformed story key "${storyKey}", skipping lookup`);
+    return null;
+  }
   const searchTitle = `Story ${epicNum}.${storyNum}:`;
   const issues = gh(
-    `issue list --search "${searchTitle}" --state all --json number,url,state --limit 1`,
-    { json: true },
+    [
+      'issue',
+      'list',
+      '--search',
+      searchTitle,
+      '--state',
+      'all',
+      '--json',
+      'number,url,state,title',
+      '--limit',
+      '5',
+    ],
+    { json: true, readOnly: true },
   );
-  return issues.length > 0 ? issues[0] : null;
+  if (!Array.isArray(issues)) return null;
+  return issues.find((i) => i.title.startsWith(searchTitle)) ?? null;
 }
 
 function buildIssueBody(story) {
   const parts = [];
 
   if (story.userStory.length > 0) {
-    parts.push('## User Story\n');
+    parts.push('## User Story');
+    parts.push('');
     parts.push(story.userStory.join('\n'));
     parts.push('');
   }
 
   if (story.acceptanceCriteria.length > 0) {
-    parts.push('## Acceptance Criteria\n');
+    parts.push('## Acceptance Criteria');
+    parts.push('');
     for (const ac of story.acceptanceCriteria) {
       parts.push(`- [ ] ${ac}`);
     }
@@ -369,69 +370,98 @@ function createIssues(stories, doneStories) {
   console.log('\n--- Issues ---');
   const issueMap = {};
 
-  // Load existing map if present
-  try {
-    const existing = JSON.parse(readFileSync(MAP_PATH, 'utf-8'));
-    Object.assign(issueMap, existing);
-  } catch {
-    // No existing map
+  // Load existing map — distinguish "missing" from "corrupt"
+  if (existsSync(MAP_PATH)) {
+    const raw = readFileSync(MAP_PATH, 'utf-8');
+    try {
+      Object.assign(issueMap, JSON.parse(raw));
+    } catch {
+      console.error(`Error: Issue map at ${MAP_PATH} contains invalid JSON.`);
+      console.error('  This may indicate corruption from a previous interrupted run.');
+      console.error('  Please inspect the file manually before re-running.');
+      process.exit(1);
+    }
   }
 
-  for (const story of stories) {
-    const title = `Story ${story.epicNumber}.${story.storyNumber}: ${story.title}`;
-    const typeLabel = classifyStory(story);
-    const labels = [typeLabel, 'status:backlog'];
+  // Fetch milestones once for all stories
+  const milestoneMap = buildMilestoneMap();
 
-    // Check if issue already exists
-    const existing = DRY_RUN ? null : getExistingIssueForStory(story.key, issueMap);
+  try {
+    for (const story of stories) {
+      const title = `Story ${story.epicNumber}.${story.storyNumber}: ${story.title}`;
+      const typeLabel = classifyStory(story);
+      const storyLabels = [typeLabel, 'status:backlog'];
 
-    if (existing) {
-      console.log(`  [exists] #${existing.number} - ${title}`);
-      issueMap[story.key] = { number: existing.number, url: existing.url };
-      continue;
-    }
+      const existing = DRY_RUN ? null : getExistingIssueForStory(story.key, issueMap);
 
-    if (DRY_RUN) {
-      console.log(`  [dry-run] Would create issue: ${title} [${typeLabel}]`);
-      issueMap[story.key] = { number: 0, url: 'dry-run' };
-      continue;
-    }
-
-    // Write issue body to temp file (avoids shell escaping issues)
-    const body = buildIssueBody(story);
-    const bodyFile = join(ROOT, '.tmp-issue-body.md');
-    writeFileSync(bodyFile, body);
-
-    // Get milestone title (gh issue create -m expects the name, not the number)
-    const milestoneTitle = getMilestoneTitle(story.epicNumber);
-    const milestoneFlag = milestoneTitle ? `-m "${milestoneTitle}"` : '';
-
-    // Create issue — gh issue create outputs the URL to stdout
-    const labelFlags = labels.map((l) => `-l "${l}"`).join(' ');
-    const issueUrl = gh(
-      `issue create --title "${title}" ${labelFlags} ${milestoneFlag} --body-file "${bodyFile}"`,
-    );
-
-    try { unlinkSync(bodyFile); } catch { /* ignore */ }
-
-    const issueNumMatch = issueUrl.match(/\/issues\/(\d+)/);
-    const result = issueNumMatch
-      ? { number: parseInt(issueNumMatch[1], 10), url: issueUrl }
-      : null;
-
-    if (result && result.number) {
-      console.log(`  [created] #${result.number} - ${title}`);
-      issueMap[story.key] = { number: result.number, url: result.url };
-
-      // Close already-done stories immediately
-      if (doneStories.has(story.key)) {
-        gh(`issue close ${result.number}`, { ignoreError: true });
-        gh(
-          `issue edit ${result.number} --remove-label "status:backlog" --add-label "status:done"`,
-          { ignoreError: true },
-        );
-        console.log(`  [closed] #${result.number} (story ${story.key} is done)`);
+      if (existing) {
+        console.log(`  [exists] #${existing.number} - ${title}`);
+        issueMap[story.key] = { number: existing.number, url: existing.url };
+        continue;
       }
+
+      if (DRY_RUN) {
+        console.log(`  [dry-run] Would create issue: ${title} [${typeLabel}]`);
+        issueMap[story.key] = { number: 0, url: 'dry-run' };
+        continue;
+      }
+
+      // Build args array — no string interpolation, no quoting hazards
+      const milestoneTitle = milestoneMap.get(story.epicNumber);
+      if (!milestoneTitle) {
+        console.warn(
+          `  [warn] No milestone for Epic ${story.epicNumber}; issue created without one.`,
+        );
+      }
+
+      const args = ['issue', 'create', '--title', title];
+      for (const l of storyLabels) {
+        args.push('-l', l);
+      }
+      if (milestoneTitle) {
+        args.push('-m', milestoneTitle);
+      }
+      args.push('--body-file', '-');
+
+      // Pipe body via stdin — no temp files
+      const body = buildIssueBody(story);
+      const issueUrl = gh(args, { input: body });
+
+      const issueNumMatch = issueUrl.match(/\/issues\/(\d+)/);
+      if (!issueNumMatch) {
+        console.error(`  [error] Issue created but could not parse number from: "${issueUrl}"`);
+        console.error(`    Story ${story.key} may not be tracked. Check GitHub manually.`);
+        continue;
+      }
+
+      const result = { number: parseInt(issueNumMatch[1], 10), url: issueUrl };
+      console.log(`  [created] #${result.number} - ${title}`);
+      issueMap[story.key] = result;
+
+      // Close already-done stories
+      if (doneStories.has(story.key)) {
+        try {
+          gh(['issue', 'close', String(result.number)]);
+          gh([
+            'issue',
+            'edit',
+            String(result.number),
+            '--remove-label',
+            'status:backlog',
+            '--add-label',
+            'status:done',
+          ]);
+          console.log(`  [closed] #${result.number} (story ${story.key} is done)`);
+        } catch (err) {
+          console.warn(`  [warn] Failed to close/update #${result.number}: ${err.message}`);
+          console.warn('         Issue may need manual status update on GitHub.');
+        }
+      }
+    }
+  } finally {
+    // Persist partial progress even if the loop threw mid-way
+    if (!DRY_RUN && Object.keys(issueMap).length > 0) {
+      saveIssueMap(issueMap);
     }
   }
 
@@ -442,10 +472,14 @@ function createIssues(stories, doneStories) {
 
 function saveIssueMap(issueMap) {
   console.log('\n--- Saving issue map ---');
-  mkdirSync(join(ROOT, '_bmad-output/implementation-artifacts'), {
-    recursive: true,
-  });
-  writeFileSync(MAP_PATH, JSON.stringify(issueMap, null, 2) + '\n');
+  const dir = join(ROOT, '_bmad-output/implementation-artifacts');
+  mkdirSync(dir, { recursive: true });
+
+  // Atomic write: write to .tmp then rename
+  const content = `${JSON.stringify(issueMap, null, 2)}\n`;
+  const tmpPath = `${MAP_PATH}.tmp`;
+  writeFileSync(tmpPath, content);
+  renameSync(tmpPath, MAP_PATH);
   console.log(`  Saved to ${MAP_PATH}`);
 }
 
@@ -455,24 +489,52 @@ function main() {
   console.log('=== BMAD -> GitHub Sync ===');
   if (DRY_RUN) console.log('(DRY RUN - no changes will be made)\n');
 
-  // Verify gh CLI
+  // Verify gh CLI is installed and authenticated
   try {
     execFileSync('gh', ['auth', 'status'], { stdio: 'pipe' });
-  } catch {
-    console.error(
-      'Error: gh CLI is not authenticated. Run `gh auth login` first.',
-    );
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      console.error('Error: `gh` CLI is not installed. Install from https://cli.github.com/');
+    } else {
+      console.error('Error: gh CLI is not authenticated or not working.');
+      console.error('  Run `gh auth login` to authenticate.');
+      console.error(`  Details: ${err.stderr || err.message}`);
+    }
     process.exit(1);
   }
 
   // Parse epics.md
-  const epicsContent = readFileSync(EPICS_PATH, 'utf-8');
+  let epicsContent;
+  try {
+    epicsContent = readFileSync(EPICS_PATH, 'utf-8');
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      console.error(`Error: epics.md not found at ${EPICS_PATH}`);
+      console.error('  Run the BMAD planning workflow to generate epics.md first.');
+    } else {
+      console.error(`Error reading epics.md: ${err.message}`);
+    }
+    process.exit(1);
+  }
+
   const { epics, stories } = parseEpics(epicsContent);
+  if (epics.length === 0 && stories.length === 0) {
+    console.error('Error: No epics or stories found in epics.md.');
+    console.error('  Expected format: "## Epic N: Title" for epics');
+    console.error('  Expected format: "### Story N.M: Title" for stories');
+    console.error(`  File: ${EPICS_PATH}`);
+    process.exit(1);
+  }
   console.log(`Parsed ${epics.length} epics, ${stories.length} stories`);
 
-  // Parse sprint-status.yaml for done stories
-  const sprintContent = readFileSync(SPRINT_STATUS_PATH, 'utf-8');
-  const doneStories = parseDoneStories(sprintContent);
+  // Parse sprint-status.yaml for done stories (optional file)
+  let doneStories = new Set();
+  try {
+    const sprintContent = readFileSync(SPRINT_STATUS_PATH, 'utf-8');
+    doneStories = parseDoneStories(sprintContent);
+  } catch {
+    console.log('  (sprint-status.yaml not found, skipping done-story detection)');
+  }
   if (doneStories.size > 0) {
     console.log(`Done stories: ${[...doneStories].join(', ')}`);
   }
@@ -481,16 +543,16 @@ function main() {
   createLabels();
   const issueMap = createIssues(stories, doneStories);
 
-  if (!DRY_RUN) {
-    saveIssueMap(issueMap);
-  } else {
-    console.log(
-      '\n[dry-run] Would save issue map with entries:',
-      Object.keys(issueMap).join(', '),
-    );
+  if (DRY_RUN) {
+    console.log('\n[dry-run] Would save issue map with entries:', Object.keys(issueMap).join(', '));
   }
 
   console.log('\n=== Done ===');
 }
 
-main();
+// Only run when executed directly (not when imported by tests)
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main();
+}
+
+export { parseEpics, parseDoneStories, classifyStory, buildIssueBody, gh };
