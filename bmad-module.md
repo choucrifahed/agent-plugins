@@ -82,3 +82,62 @@ This would matter if you ever publish the module to BMAD's marketplace.
 | Contribute patterns back? | **Optional** — good for the ecosystem |
 
 The plugin is a **Claude Code orchestration layer on top of BMAD workflows**, and that's exactly the right architecture. The enhancements are about making it a better citizen in both ecosystems, not about replacing one with the other.
+
+---
+
+## Enhancement Plan (Incremental)
+
+Work in two phases: **A (Portability + Robustness)** first, then **B (Ecosystem Fit)**.
+
+### Phase A: Portability + Robustness
+
+#### A1. Dynamic BMAD Path Resolution
+
+`_bmad-output` is hardcoded 37 times across 7 files. BMAD's global config exposes `output_folder` (default: `_bmad-output`).
+
+- [ ] **Script:** In `sync-stories-to-github.mjs`, read BMAD config at startup to resolve `output_folder`. Fall back to `_bmad-output` if no config found.
+- [ ] **Commands:** In all 5 command files, add a pre-step: "Read `_bmad/bmad.config.yaml` and resolve `output_folder`. If not found, default to `_bmad-output`." Replace all hardcoded `_bmad-output` references with the resolved path.
+- [ ] **Tests:** Update tests to cover both default and custom `output_folder` scenarios.
+
+#### A2. Force-Close Detection in `/story-sync`
+
+Currently, `/story-sync` treats all closed GitHub issues the same. A manually closed issue (no merged PR) triggers `done` + worktree cleanup, potentially losing work.
+
+- [ ] When a closed issue is detected, query for merged PRs: `gh pr list --search "<issue>" --state merged`
+- [ ] If merged PR exists → proceed normally (mark done, cleanup)
+- [ ] If no merged PR → warn the user, skip auto-cleanup, leave status unchanged
+- [ ] Add tests for both code paths
+
+#### A3. PR Description Update on Re-Review
+
+`/story-review` commits fixes but doesn't update the PR description. Reviewers see stale info.
+
+- [ ] After committing review fixes, regenerate the PR body's change summary using `git diff --stat main...HEAD`
+- [ ] Update the PR via `gh pr edit <number> --body <updated-body>`
+- [ ] Add a PR comment noting review fixes were applied
+
+### Phase B: Ecosystem Fit
+
+#### B1. Companion BMAD Extension Module
+
+Make the plugin's workflows discoverable through `bmad help`.
+
+- [ ] Create `bmad-github-module/src/module.yaml` with `extends-module: bmm`, targeting phase-4 (implementation)
+- [ ] Create `bmad-github-module/src/module-help.csv` with 5 entries (init, create, dev, review, sync) — 13 columns per the BMAD spec
+- [ ] Document that execution requires the Claude Code plugin; the module provides discoverability only
+
+#### B2. BMAD Install Question Pattern
+
+Support BMAD's `npx bmad-method install` flow alongside the existing `.local.md` config.
+
+- [ ] Add `install` questions to `module.yaml` for `worktree_root` and other configurable values
+- [ ] Update commands to read both BMAD install config AND `.claude/bmad-github.local.md`, with `.local.md` taking precedence (backward compatibility)
+
+#### B3. Contribute Story Lifecycle Patterns to BMM
+
+Extract GitHub-independent workflow patterns as reusable BMAD workflow templates.
+
+- [ ] **Dependency analysis template** — Extract the logic from `/story-create` that detects code-level dependencies between stories (shared types, APIs, packages). Package as a reusable workflow step for BMM's `create-story` workflow.
+- [ ] **Auto-commit layer template** — Extract the pattern from `/story-dev` where each completed task checkbox triggers a conventional commit. Useful for any CI/CD pipeline, not just GitHub PRs.
+- [ ] **Human quality gate template** — Extract the pattern from `/story-review` where review fixes are committed but status never advances to `done` without human action. Encodes the principle that AI-generated code requires human sign-off.
+- [ ] Package as BMAD workflow YAML files with GitHub-specific parts as optional extension points
