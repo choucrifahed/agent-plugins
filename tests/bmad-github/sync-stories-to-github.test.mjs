@@ -243,11 +243,7 @@ describe('parseDoneStories', () => {
   });
 
   it('handles mixed bare-key and slug formats', () => {
-    const yaml = [
-      'sprint-1:',
-      '  1-1-setup-project: done',
-      '  2-1: done',
-    ].join('\n');
+    const yaml = ['sprint-1:', '  1-1-setup-project: done', '  2-1: done'].join('\n');
     const done = parseDoneStories(yaml);
     expect(done).toEqual(new Set(['1-1', '2-1']));
   });
@@ -463,10 +459,12 @@ describe('gh', () => {
 
   it('throws descriptive error when JSON parsing fails', () => {
     execFileSync.mockReturnValue('<html>502 Bad Gateway</html>');
-    expect(() => gh(['api', 'repos/{owner}/{repo}/milestones'], { json: true, readOnly: true }))
-      .toThrow(/Failed to parse JSON/);
-    expect(() => gh(['api', 'repos/{owner}/{repo}/milestones'], { json: true, readOnly: true }))
-      .toThrow(/502 Bad Gateway/);
+    expect(() =>
+      gh(['api', 'repos/{owner}/{repo}/milestones'], { json: true, readOnly: true }),
+    ).toThrow(/Failed to parse JSON/);
+    expect(() =>
+      gh(['api', 'repos/{owner}/{repo}/milestones'], { json: true, readOnly: true }),
+    ).toThrow(/502 Bad Gateway/);
   });
 
   it('handles JSON objects (not just arrays)', () => {
