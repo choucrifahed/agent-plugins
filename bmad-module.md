@@ -103,10 +103,10 @@ Work in two phases: **A (Portability + Robustness)** first, then **B (Ecosystem 
 
 Currently, `/story-sync` treats all closed GitHub issues the same. A manually closed issue (no merged PR) triggers `done` + worktree cleanup, potentially losing work.
 
-- [ ] When a closed issue is detected, query for merged PRs: `gh pr list --search "<issue>" --state merged`
-- [ ] If merged PR exists → proceed normally (mark done, cleanup)
-- [ ] If no merged PR → warn the user, skip auto-cleanup, leave status unchanged
-- [ ] Add tests for both code paths
+- [x] When a closed issue is detected, query for merged PRs: `gh pr list --search "<issue>" --state merged`
+- [x] If merged PR exists → proceed normally (mark done, cleanup)
+- [x] If no merged PR → warn the user, skip auto-cleanup, leave status unchanged
+- [ ] Add tests for both code paths (N/A — this is a command file change, not script logic; tested via manual invocation)
 
 #### A3. PR Description Update on Re-Review
 

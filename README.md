@@ -64,7 +64,9 @@ story-init ──► story-create ──► story-dev ──► story-review
 5. The **user** reviews and merges the PR on GitHub (quality gate).
 6. **`/story-sync`** — Detects the merged PR, marks the story as `done` in BMAD, cleans up the worktree and branch.
 
-The user is always the quality gate — no story is marked done without human review and merge.
+The user is always the quality gate — no story is marked done without human review and merge. If an issue is closed
+manually (without a merged PR), `/story-sync` will warn and ask the user for feedback rather than marking it done and
+cleaning up the worktree.
 
 ### Configuration
 

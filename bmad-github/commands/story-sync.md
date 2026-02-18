@@ -74,22 +74,49 @@ Store the resolved path as `<worktree-root>` for use in Phase 3 below.
 
 For each story where **GitHub issue is CLOSED** but **BMAD status is NOT `done`**:
 
-1. **Update sprint-status.yaml:**
-   - Find the line matching this story's key pattern (e.g., `1-2-bridge-interface-and-shared-type-contracts`)
-   - Change its status from whatever it currently is to `done`
+### Step 1: Verify the issue was closed via a merged PR
 
-2. **Update the story file** (if it exists in `<output_folder>/implementation-artifacts/`):
-   - Glob for `<output_folder>/implementation-artifacts/<key>-*.md` (e.g., `1-4-*.md` for story key `1-4`)
-   - If a matching file is found, find the line that starts with `Status:` near the top of the file (typically line 3) and change it to `Status: done`
-   - Example: change `Status: review` to `Status: done`
-   - **This step is REQUIRED** — do not skip it. Story files must stay in sync with sprint-status.yaml.
+Check whether a merged PR references this issue:
+```
+gh pr list --search "<issue_number>" --state merged --json number,title --limit 5
+```
 
-3. **Update GitHub issue labels:**
-   ```
-   gh issue edit <number> --remove-label "status:backlog" --remove-label "status:ready" --remove-label "status:in-progress" --remove-label "status:review" --add-label "status:done"
-   ```
+- **If a merged PR exists** → proceed with steps 2-5 below (normal done flow)
+- **If NO merged PR exists** → the issue was closed without code being merged. **Do NOT mark it done automatically.** Instead, print a warning and ask the user how to proceed:
+  ```
+  ⚠ Issue #<number> (story <key>) was closed without a merged PR.
 
-4. **Report:** Print "Synced story N.M → done (PR merged on GitHub)"
+  How would you like to handle this?
+    1. Skip — leave BMAD status unchanged (issue may have been closed accidentally)
+    2. Mark as done — the story was intentionally completed or is no longer needed
+    3. Re-open — re-open the issue on GitHub and leave BMAD status unchanged
+  ```
+  - **If the user chooses Skip** → do nothing for this story
+  - **If the user chooses Mark as done** → proceed with steps 2-5 below (same as merged PR flow)
+  - **If the user chooses Re-open** → run `gh issue reopen <number>` and skip this story
+
+### Step 2: Update sprint-status.yaml
+
+- Find the line matching this story's key pattern (e.g., `1-2-bridge-interface-and-shared-type-contracts`)
+- Change its status from whatever it currently is to `done`
+
+### Step 3: Update the story file
+
+If the story file exists in `<output_folder>/implementation-artifacts/`:
+- Glob for `<output_folder>/implementation-artifacts/<key>-*.md` (e.g., `1-4-*.md` for story key `1-4`)
+- If a matching file is found, find the line that starts with `Status:` near the top of the file (typically line 3) and change it to `Status: done`
+- Example: change `Status: review` to `Status: done`
+- **This step is REQUIRED** — do not skip it. Story files must stay in sync with sprint-status.yaml.
+
+### Step 4: Update GitHub issue labels
+
+```
+gh issue edit <number> --remove-label "status:backlog" --remove-label "status:ready" --remove-label "status:in-progress" --remove-label "status:review" --add-label "status:done"
+```
+
+### Step 5: Report
+
+Print "Synced story N.M → done (PR #<pr_number> merged on GitHub)"
 
 ## Phase 3: Clean Up Worktrees for Completed Stories
 
