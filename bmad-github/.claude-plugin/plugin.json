@@ -1,5 +1,6 @@
 {
   "name": "bmad-github",
+  "version": "1.0.0",
   "description": "BMAD + GitHub story workflow with git worktrees for parallel agent development",
   "keywords": ["bmad", "github", "stories", "worktrees", "project-management", "issues", "milestones", "labels"]
 }

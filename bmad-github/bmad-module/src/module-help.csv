@@ -1,0 +1,6 @@
+module,phase,name,code,sequence,workflow-file,command,required,agent,options,description,output-location,outputs
+bmad-github,phase-4,Story Init,SI,10,,story_init,false,,Create Mode,"Batch sync BMAD epics to GitHub — creates milestones labels and issues from epics.md. Run once to bootstrap or re-run when epics change.",implementation-artifacts,github-issue-map.json
+bmad-github,phase-4,Story Create,SC,20,,story_create,false,,Create Mode,"Sync GitHub state then run BMAD create-story workflow to plan the next story. Updates GitHub issue label to ready.",implementation-artifacts,story file
+bmad-github,phase-4,Story Dev,SD,30,,story_dev,false,,Create Mode,"Create git worktree and branch then run BMAD dev-story workflow with auto-commits per task. Creates PR on completion.",implementation-artifacts,PR and commits
+bmad-github,phase-4,Story Review,SR,40,,story_review,false,,Chat Mode,"Run BMAD adversarial code review and push fixes. Does NOT mark story as done — the user merges the PR on GitHub.",implementation-artifacts,review fixes
+bmad-github,phase-4,Story Sync,SS,50,,story_sync,false,,Create Mode,"Reconcile GitHub state with BMAD files. Detects merged PRs marks stories done and cleans up worktrees and branches.",implementation-artifacts,sprint-status updates

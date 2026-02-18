@@ -1,0 +1,8 @@
+code: bmad-github
+name: "GitHub Story Workflow"
+version: "1.0.0"
+extends-module: bmm
+description: "GitHub + git worktree orchestration for BMAD stories. Provides story lifecycle commands (init, create, dev, review, sync) that bridge BMAD workflows with GitHub issue tracking, milestones, labels, and PRs. Requires the bmad-github Claude Code plugin for execution."
+
+config:
+  output_folder: "{project-root}/_bmad-output"

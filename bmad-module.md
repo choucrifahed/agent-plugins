@@ -122,9 +122,9 @@ Currently, `/story-sync` treats all closed GitHub issues the same. A manually cl
 
 Make the plugin's workflows discoverable through `bmad help`.
 
-- [ ] Create `bmad-github-module/src/module.yaml` with `extends-module: bmm`, targeting phase-4 (implementation)
-- [ ] Create `bmad-github-module/src/module-help.csv` with 5 entries (init, create, dev, review, sync) — 13 columns per the BMAD spec
-- [ ] Document that execution requires the Claude Code plugin; the module provides discoverability only
+- [x] Created `bmad-github/bmad-module/src/module.yaml` with `extends-module: bmm`, targeting phase-4 (implementation)
+- [x] Created `bmad-github/bmad-module/src/module-help.csv` with 5 entries (SI, SC, SD, SR, SS) — 13 columns per the BMAD spec
+- [x] Added `bmad-github/bmad-module/README.md` documenting that execution requires the Claude Code plugin; the module provides discoverability only
 
 #### B2. BMAD Install Question Pattern
 

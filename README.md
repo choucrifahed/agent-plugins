@@ -149,6 +149,13 @@ first. `/story-sync` then detects the merge, marks the story done in BMAD, close
 Each story gets its own git worktree and branch. Multiple Claude Code agents can work simultaneously — each in its own
 worktree directory, on its own branch — without interfering with each other or the main repo.
 
+### BMAD Companion Module
+
+A companion BMAD extension module is included at `bmad-github/bmad-module/`. It registers the 5 story lifecycle
+workflows in BMAD's help system (phase-4, implementation) so they're discoverable through `bmad help`. The module
+provides discoverability only — execution requires this Claude Code plugin. See
+[bmad-module/README.md](bmad-github/bmad-module/README.md) for installation instructions.
+
 ## License
 
 MIT
