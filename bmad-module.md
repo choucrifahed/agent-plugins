@@ -112,9 +112,9 @@ Currently, `/story-sync` treats all closed GitHub issues the same. A manually cl
 
 `/story-review` commits fixes but doesn't update the PR description. Reviewers see stale info.
 
-- [ ] After committing review fixes, regenerate the PR body's change summary using `git diff --stat main...HEAD`
-- [ ] Update the PR via `gh pr edit <number> --body <updated-body>`
-- [ ] Add a PR comment noting review fixes were applied
+- [x] After committing review fixes, regenerate the PR body's change summary using `git diff --stat main...HEAD`
+- [x] Update the PR via `gh pr edit <number> --body <updated-body>` — replaces the `## Changes` section while keeping other sections intact
+- [x] Add a PR comment summarizing what the review found and fixed
 
 ### Phase B: Ecosystem Fit
 

@@ -84,6 +84,36 @@ Push all commits at the end:
 git push
 ```
 
+### Update PR Description
+
+After pushing review fixes, update the PR so reviewers see the current state:
+
+1. **Regenerate the change summary** from the full branch diff:
+   ```
+   git diff --stat main...HEAD
+   ```
+
+2. **Read the current PR body:**
+   ```
+   gh pr view --json body --jq '.body'
+   ```
+
+3. **Update the PR body** — replace the `## Changes` section with the updated diff stat. Keep all other sections (User Story, Test Coverage, etc.) unchanged:
+   ```
+   gh pr edit <number> --body "<updated body>"
+   ```
+
+4. **Add a PR comment** summarizing what the review found and fixed:
+   ```
+   gh pr comment <number> --body "## Code Review Fixes
+
+   Applied fixes from BMAD adversarial code review:
+   <brief list of what was changed>
+
+   ---
+   _Reviewed via BMAD workflow_"
+   ```
+
 ### Report Based on Review Outcome
 
 **If all issues are resolved** (BMAD review passed — story would have been marked "done"):
