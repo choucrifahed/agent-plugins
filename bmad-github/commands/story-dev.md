@@ -18,18 +18,7 @@ You are developing a story. This command handles the full lifecycle:
 
 ## Phase 0: Sync First
 
-Run the full `/story-sync` logic to catch up on any merged PRs before starting.
-This ensures sprint-status.yaml is current.
-
-Specifically, execute the same steps as the story-sync command:
-1. Verify on main branch, pull latest
-2. Read issue map and sprint-status.yaml
-3. Query GitHub for closed issues
-4. Sync any closed issues → BMAD done
-5. Clean up completed worktrees
-6. Commit sync changes if any
-
-If sync made changes, push them before proceeding.
+Read and follow `${CLAUDE_PLUGIN_ROOT}/references/sync-first.md`.
 
 ---
 
@@ -92,26 +81,7 @@ If sync made changes, push them before proceeding.
 
 ### Step 1: Resolve Worktree Root
 
-Determine where worktrees are stored for this project:
-
-1. **Check for a local config override:**
-   Read `.claude/bmad-github.local.md` if it exists. Look for a `worktree-root` field in the YAML frontmatter.
-
-2. **If no override found, auto-detect:**
-   ```
-   basename $(git rev-parse --show-toplevel)
-   ```
-   The default worktree root is `../<repo-name>-worktrees/` relative to the repo root.
-
-Store the resolved path as `<worktree-root>`.
-
-3. **Persist the config if it doesn't exist:**
-   If `.claude/bmad-github.local.md` did NOT already exist, create it now with the resolved worktree root so future runs (and `/story-sync`) skip auto-detection:
-   ```markdown
-   ---
-   worktree-root: <worktree-root>
-   ---
-   ```
+Read and follow `${CLAUDE_PLUGIN_ROOT}/references/resolve-worktree-root.md`.
 
 ### Step 2: Update status to in-progress
 
@@ -183,15 +153,7 @@ cd <worktree-root>/story-<story_key>/
 
 ## Phase 3: Run BMAD dev-story Workflow
 
-Execute the standard BMAD dev-story workflow using the 5-step loader pattern:
-
-<steps CRITICAL="TRUE">
-1. Always LOAD the FULL @{project-root}/_bmad/core/tasks/workflow.xml
-2. READ its entire contents - this is the CORE OS for EXECUTING the specific workflow-config @{project-root}/_bmad/bmm/workflows/4-implementation/dev-story/workflow.yaml
-3. Pass the yaml path @{project-root}/_bmad/bmm/workflows/4-implementation/dev-story/workflow.yaml as 'workflow-config' parameter to the workflow.xml instructions
-4. Follow workflow.xml instructions EXACTLY as written to process and follow the specific workflow config and its instructions
-5. Save outputs after EACH section when generating any documents from templates
-</steps>
+Read and follow `${CLAUDE_PLUGIN_ROOT}/references/bmad-workflow-loader.md` with `<workflow-path>` = `_bmad/bmm/workflows/4-implementation/dev-story/workflow.yaml`.
 
 ### Auto-Commit Instruction (Layer on top of BMAD workflow)
 

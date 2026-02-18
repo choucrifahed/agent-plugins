@@ -130,8 +130,9 @@ Make the plugin's workflows discoverable through `bmad help`.
 
 Support BMAD's `npx bmad-method install` flow alongside the existing `.local.md` config.
 
-- [ ] Add `install` questions to `module.yaml` for `worktree_root` and other configurable values
-- [ ] Update commands to read both BMAD install config AND `.claude/bmad-github.local.md`, with `.local.md` taking precedence (backward compatibility)
+- [x] Added `install` question to `module.yaml` for `worktree_root` with default and custom path options
+- [x] Updated `story-dev` and `story-sync` to check BMAD install config (`_bmad/bmm/config.yaml` → `worktree_root`) as step 2, with `.local.md` still taking precedence (backward compatibility)
+- [x] Extracted 3 shared reference files (`references/sync-first.md`, `references/resolve-worktree-root.md`, `references/bmad-workflow-loader.md`) to eliminate duplicated procedural blocks across command files
 
 #### B3. Contribute Story Lifecycle Patterns to BMM
 

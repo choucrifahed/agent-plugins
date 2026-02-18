@@ -6,3 +6,10 @@ description: "GitHub + git worktree orchestration for BMAD stories. Provides sto
 
 config:
   output_folder: "{project-root}/_bmad-output"
+
+install:
+  - question: "Where should git worktrees be created?"
+    config_key: "worktree_root"
+    options:
+      - "../{repo-name}-worktrees"
+      - "custom path"

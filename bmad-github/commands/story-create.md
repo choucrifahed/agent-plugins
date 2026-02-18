@@ -17,32 +17,13 @@ After the workflow, the user reviews the output, commits when happy, then runs `
 
 ## Phase 0: Sync First
 
-Run the full `/story-sync` logic to catch up on any merged PRs before picking the next story.
-This ensures sprint-status.yaml is current.
-
-Specifically, execute the same steps as the story-sync command:
-1. Verify on main branch, pull latest
-2. Read issue map and sprint-status.yaml
-3. Query GitHub for closed issues
-4. Sync any closed issues → BMAD done
-5. Clean up completed worktrees
-6. Commit sync changes if any
-
-If sync made changes, push them before proceeding.
+Read and follow `${CLAUDE_PLUGIN_ROOT}/references/sync-first.md`.
 
 ---
 
 ## Phase 1: Run BMAD create-story Workflow
 
-Execute the standard BMAD create-story workflow using the 5-step loader pattern:
-
-<steps CRITICAL="TRUE">
-1. Always LOAD the FULL @{project-root}/_bmad/core/tasks/workflow.xml
-2. READ its entire contents - this is the CORE OS for EXECUTING the specific workflow-config @{project-root}/_bmad/bmm/workflows/4-implementation/create-story/workflow.yaml
-3. Pass the yaml path @{project-root}/_bmad/bmm/workflows/4-implementation/create-story/workflow.yaml as 'workflow-config' parameter to the workflow.xml instructions
-4. Follow workflow.xml instructions EXACTLY as written to process and follow the specific workflow config and its instructions
-5. Save outputs after EACH section when generating any documents from templates
-</steps>
+Read and follow `${CLAUDE_PLUGIN_ROOT}/references/bmad-workflow-loader.md` with `<workflow-path>` = `_bmad/bmm/workflows/4-implementation/create-story/workflow.yaml`.
 
 After the workflow completes, note:
 - The **story ID** (e.g., `1-2`)

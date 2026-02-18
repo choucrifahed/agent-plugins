@@ -12,26 +12,7 @@ You are performing a sync operation that makes BMAD files reflect the current st
 
 ## Resolve Worktree Root
 
-Determine where worktrees are stored for this project:
-
-1. **Check for a local config override:**
-   Read `.claude/bmad-github.local.md` if it exists. Look for a `worktree-root` field in the YAML frontmatter.
-
-2. **If no override found, auto-detect:**
-   ```
-   basename $(git rev-parse --show-toplevel)
-   ```
-   The default worktree root is `../<repo-name>-worktrees/` relative to the repo root.
-
-Store the resolved path as `<worktree-root>` for use in Phase 3 below.
-
-3. **Persist the config if it doesn't exist:**
-   If `.claude/bmad-github.local.md` did NOT already exist, create it now with the resolved worktree root so future runs (and `/story-dev`) skip auto-detection:
-   ```markdown
-   ---
-   worktree-root: <worktree-root>
-   ---
-   ```
+Read and follow `${CLAUDE_PLUGIN_ROOT}/references/resolve-worktree-root.md`.
 
 ## Pre-flight Checks
 
