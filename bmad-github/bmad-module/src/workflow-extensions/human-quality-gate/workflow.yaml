@@ -1,0 +1,24 @@
+name: human-quality-gate
+description: "Override the code-review workflow's done transition so that AI review fixes are committed but story status never advances to done without explicit human approval"
+author: "bmad-github"
+version: "1.0.0"
+extends-workflow: "code-review"
+extension-point: "status-transition-override"
+
+# This extension enforces the principle that AI-generated code requires
+# human sign-off before being marked complete. The standard code-review
+# workflow transitions status to "done" after review passes — this
+# extension keeps status at "review" and defers "done" to an external
+# human-controlled process.
+#
+# GitHub-independent: the "done" trigger can be a PR merge, a manual
+# status change, a CI/CD gate, or any other human-initiated action.
+# The key invariant is: no story reaches "done" without human approval.
+
+# Workflow components
+installed_path: "{project-root}/_bmad/bmm/workflow-extensions/human-quality-gate"
+instructions: "{installed_path}/instructions.md"
+
+# Required inputs
+implementation_artifacts: "{config_source}:implementation_artifacts"
+sprint_status: "{implementation_artifacts}/sprint-status.yaml"

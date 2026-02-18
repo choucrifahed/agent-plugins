@@ -1,0 +1,21 @@
+name: dependency-analysis
+description: "Analyze code-level dependencies between stories in the same epic to determine which can be developed in parallel and which are genuinely blocked"
+author: "bmad-github"
+version: "1.0.0"
+extends-workflow: "create-story"
+extension-point: "post-story-creation"
+
+# This extension adds a dependency analysis step after a story is created.
+# It examines implementation details (packages, types, APIs, files) to detect
+# genuine code-level dependencies — not just sequential numbering.
+#
+# GitHub-independent: works with any sprint tracking system that has story
+# files and a status tracker (sprint-status.yaml or equivalent).
+
+# Workflow components
+installed_path: "{project-root}/_bmad/bmm/workflow-extensions/dependency-analysis"
+instructions: "{installed_path}/instructions.md"
+
+# Required inputs
+implementation_artifacts: "{config_source}:implementation_artifacts"
+sprint_status: "{implementation_artifacts}/sprint-status.yaml"
