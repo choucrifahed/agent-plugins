@@ -5,7 +5,7 @@ workflows discoverable through `bmad help`.
 
 ## What This Module Does
 
-It registers 5 workflows in BMAD's help system under phase-4 (implementation):
+It registers 6 workflows in BMAD's help system under phase-4 (implementation):
 
 | Code | Name | Description |
 |------|------|-------------|
@@ -14,6 +14,7 @@ It registers 5 workflows in BMAD's help system under phase-4 (implementation):
 | SD | Story Dev | Implement a story with worktree + PR |
 | SR | Story Review | Adversarial code review |
 | SS | Story Sync | Reconcile GitHub state with BMAD files |
+| SCI | Story Setup CI | Install the BMAD Story Sync GitHub Actions workflow |
 
 ## What This Module Does NOT Do
 

@@ -33,13 +33,14 @@ milestones and PRs. These are concerns that BMAD's module system isn't designed 
 
 ### Commands
 
-The plugin provides five slash commands that form a story lifecycle. These commands orchestrate BMAD's **own
+The plugin provides six slash commands that form a story lifecycle. These commands orchestrate BMAD's **own
 workflows (create-story, dev-story, code-review) under the hood** — if you **update** your BMAD modules, the
 plugin **automatically picks up the changes**.
 
 | Command | Description                                                                   |
 |---------|-------------------------------------------------------------------------------|
 | `/story-init` | Batch sync BMAD epics to GitHub — creates milestones, labels, and issues from `epics.md` |
+| `/story-setup-ci` | Install the BMAD Story Sync GitHub Actions workflow into the current project |
 | `/story-create` | Sync GitHub state, then run BMAD create-story workflow to plan a story, marks the GitHub issue in ready |
 | `/story-dev` | Create a git worktree, run BMAD dev-story workflow with auto-commits per task, then create a PR |
 | `/story-review` | Run BMAD adversarial code review and push fixes (does NOT mark story as done) |
@@ -56,8 +57,9 @@ story-init ──► story-create ──► story-dev ──► story-review
 ```
 
 1. **`/story-init`** — Run once to create GitHub milestones and issues from your BMAD epics.
-                       You can also run it everytime you change your roadmap in BMAD to add new issues and milestones 
+                       You can also run it everytime you change your roadmap in BMAD to add new issues and milestones
                        in GitHub.
+1. **`/story-setup-ci`** — Run once to install the GitHub Actions workflow that auto-syncs issue closures to BMAD files.
 2. **`/story-create`** — Pick the next story, run the BMAD planning workflow, update GitHub labels.
 3. **`/story-dev`** — Set up a git worktree, implement the story with granular commits, open a PR.
 4. **`/story-review`** — Run BMAD code review; the story stays at `review` status (not `done`).
@@ -86,8 +88,8 @@ This file is auto-created on first run of `/story-dev` or `/story-sync`.
 
 #### BMAD Output Folder
 
-The plugin reads the BMAD output folder from `_bmad/bmm/config.yaml` (`output_folder` key). If no config is found, it
-defaults to `_bmad-output`. This makes the plugin portable across different BMAD setups.
+The plugin reads the BMAD output folder from `_bmad/bmm/config.yaml` or `_bmad/bmb/config.yaml` (`output_folder` key).
+If no config is found, it defaults to `_bmad-output`. This makes the plugin portable across different BMAD setups.
 
 ### Epics → Milestones
 
@@ -151,7 +153,7 @@ worktree directory, on its own branch — without interfering with each other or
 
 ### BMAD Companion Module
 
-A companion BMAD extension module is included at `bmad-github/bmad-module/`. It registers the 5 story lifecycle
+A companion BMAD extension module is included at `bmad-github/bmad-module/`. It registers the 6 story lifecycle
 workflows in BMAD's help system (phase-4, implementation) so they're discoverable through `bmad help`. The module
 provides discoverability only — execution requires this Claude Code plugin. See
 [bmad-module/README.md](bmad-github/bmad-module/README.md) for installation instructions.

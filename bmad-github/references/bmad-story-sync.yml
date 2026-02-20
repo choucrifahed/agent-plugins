@@ -1,0 +1,154 @@
+name: BMAD Story Sync
+
+on:
+  issues:
+    types: [closed]
+
+concurrency:
+  group: bmad-story-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - name: Resolve BMAD output folder
+        id: bmad-config
+        run: |
+          CONFIG=""
+          for candidate in "_bmad/bmm/config.yaml" "_bmad/bmb/config.yaml"; do
+            if [ -f "$candidate" ]; then
+              CONFIG="$candidate"
+              break
+            fi
+          done
+          if [ -z "$CONFIG" ]; then
+            echo "::warning::BMAD config not found. Defaulting to _bmad-output."
+            OUTPUT_FOLDER="_bmad-output"
+          else
+            RAW=$(grep '^output_folder:' "$CONFIG" | sed 's/output_folder: *//' | sed 's/"//g')
+            # Strip {project-root}/ since we're already at repo root
+            OUTPUT_FOLDER=$(echo "$RAW" | sed 's|{project-root}/||' | sed 's|{project-root}||')
+          fi
+          echo "output_folder=$OUTPUT_FOLDER" >> "$GITHUB_OUTPUT"
+          echo "Resolved output folder: $OUTPUT_FOLDER"
+
+      - name: Sync closed issue to BMAD
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          OUTPUT_FOLDER: ${{ steps.bmad-config.outputs.output_folder }}
+        run: |
+          ARTIFACTS="$OUTPUT_FOLDER/implementation-artifacts"
+          ISSUE_MAP="$ARTIFACTS/github-issue-map.json"
+          SPRINT_STATUS="$ARTIFACTS/sprint-status.yaml"
+
+          # 1. Find the story key for this issue number
+          STORY_KEY=$(jq -r --argjson num "$ISSUE_NUMBER" \
+            'to_entries[] | select(.value.number == $num) | .key' \
+            "$ISSUE_MAP")
+
+          if [ -z "$STORY_KEY" ]; then
+            echo "Issue #$ISSUE_NUMBER is not mapped to a BMAD story. Skipping."
+            exit 0
+          fi
+
+          echo "Found story $STORY_KEY for issue #$ISSUE_NUMBER"
+
+          # 2. Find the full sprint key and current status
+          SPRINT_LINE=$(grep "^  ${STORY_KEY}-[a-z]" "$SPRINT_STATUS" | head -1)
+
+          if [ -z "$SPRINT_LINE" ]; then
+            echo "::warning::Story $STORY_KEY not found in sprint-status.yaml"
+            exit 0
+          fi
+
+          SPRINT_KEY=$(echo "$SPRINT_LINE" | sed 's/:.*//' | sed 's/^  //')
+          CURRENT_STATUS=$(echo "$SPRINT_LINE" | sed 's/.*: //')
+
+          if [ "$CURRENT_STATUS" = "done" ]; then
+            echo "Story $STORY_KEY is already done. Nothing to sync."
+            exit 0
+          fi
+
+          # 3. Verify a merged PR exists for this issue
+          MERGED_PR=$(gh pr list --search "#$ISSUE_NUMBER" --state merged \
+            --json number --jq '.[0].number // empty' --limit 5)
+
+          if [ -z "$MERGED_PR" ]; then
+            echo "::warning::Issue #$ISSUE_NUMBER (story $STORY_KEY) closed without a merged PR. Skipping."
+            exit 0
+          fi
+
+          echo "Verified merged PR #$MERGED_PR for story $STORY_KEY"
+
+          # 4. Update sprint-status.yaml
+          sed -i "s/^  ${SPRINT_KEY}: .*$/  ${SPRINT_KEY}: done/" "$SPRINT_STATUS"
+          echo "Updated sprint-status.yaml: $SPRINT_KEY -> done"
+
+          # 5. Update story .md file (Status line near top of file)
+          STORY_FILE=$(ls ${ARTIFACTS}/${STORY_KEY}-*.md 2>/dev/null | head -1)
+          if [ -n "$STORY_FILE" ]; then
+            sed -i 's/^Status: .*/Status: done/' "$STORY_FILE"
+            echo "Updated $STORY_FILE -> done"
+          fi
+
+          # 6. Update GitHub issue labels
+          gh issue edit "$ISSUE_NUMBER" \
+            --remove-label "status:backlog" \
+            --remove-label "status:ready" \
+            --remove-label "status:in-progress" \
+            --remove-label "status:review" \
+            --add-label "status:done" 2>/dev/null || true
+          echo "Updated labels on issue #$ISSUE_NUMBER"
+
+          # 7. Check epic completion
+          EPIC=$(echo "$STORY_KEY" | cut -d'-' -f1)
+          ALL_DONE=true
+
+          for key in $(jq -r --arg e "$EPIC" \
+            'to_entries[] | select(.key | startswith($e + "-")) | .key' \
+            "$ISSUE_MAP"); do
+            match=$(grep "^  ${key}-[a-z]" "$SPRINT_STATUS" | head -1)
+            if [ -n "$match" ]; then
+              status=$(echo "$match" | sed 's/.*: //')
+              if [ "$status" != "done" ]; then
+                ALL_DONE=false
+                break
+              fi
+            fi
+          done
+
+          if [ "$ALL_DONE" = true ]; then
+            sed -i "s/^  epic-${EPIC}: .*$/  epic-${EPIC}: done/" "$SPRINT_STATUS"
+            echo "All stories complete - updated epic-${EPIC} -> done"
+          fi
+
+          # Export for commit step
+          echo "STORY_KEY=$STORY_KEY" >> "$GITHUB_ENV"
+          echo "MERGED_PR=$MERGED_PR" >> "$GITHUB_ENV"
+          echo "ARTIFACTS=$ARTIFACTS" >> "$GITHUB_ENV"
+          echo "CHANGES=true" >> "$GITHUB_ENV"
+
+      - name: Commit and push
+        if: env.CHANGES == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$ARTIFACTS/"
+          if git diff --cached --quiet; then
+            echo "No file changes detected."
+            exit 0
+          fi
+          git commit -m "chore(sync): mark story $STORY_KEY done (PR #$MERGED_PR)"
+          git pull --rebase
+          git push
