@@ -6,7 +6,7 @@ A Claude Code plugin marketplace for agent-driven development workflows.
 
 BMAD + GitHub story workflow orchestration with git worktrees for parallel agent development.
 
-This plugin bridges [BMAD Method](https://bmad-builder-docs.bmad-method.org/) workflows with GitHub project management.
+This plugin bridges [BMAD Method](https://docs.bmad-method.org/) workflows with GitHub project management.
 It orchestrates BMAD's create-story, dev-story, and code-review workflows while adding GitHub issue sync, git worktree
 management, auto-commits per task, and PR creation.
 
@@ -21,8 +21,8 @@ milestones and PRs. These are concerns that BMAD's module system isn't designed 
 - [Claude Code](https://claude.com/claude-code) installed
 - [`gh` CLI](https://cli.github.com/) installed and authenticated (`gh auth login`)
 - [Node.js](https://nodejs.org/) (for the batch sync script)
-- A project using the [BMAD Method](https://bmad-builder-docs.bmad-method.org/) with `_bmad/` directory (output folder is read from `_bmad/bmm/config.yaml`, 
-  defaults to `_bmad-output/`)
+- A project using the [BMAD Method](https://docs.bmad-method.org/) with `_bmad/` directory (output folder is read from 
+  `_bmad/bmm/config.yaml`, defaults to `_bmad-output/`)
 
 ### Installation
 
