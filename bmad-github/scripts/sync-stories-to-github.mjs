@@ -203,34 +203,38 @@ function parseDoneStories(sprintContent) {
 // --- Fetch milestones --------------------------------------------------
 
 function fetchMilestones() {
-  const milestones = gh(
-    ['api', 'repos/{owner}/{repo}/milestones?state=all', '--paginate', '--slurp'],
-    { json: true, readOnly: true },
-  );
-  if (!Array.isArray(milestones)) {
+  const raw = gh(['api', 'repos/{owner}/{repo}/milestones?state=all', '--paginate', '--slurp'], {
+    json: true,
+    readOnly: true,
+  });
+  if (!Array.isArray(raw)) {
     throw new Error(
-      `Expected array of milestones from API, got ${typeof milestones}. ` +
+      `Expected array of milestones from API, got ${typeof raw}. ` +
         'This may indicate a pagination or authentication issue.',
     );
   }
-  return milestones;
+  // `gh api --paginate --slurp` wraps each page in the outer array, so a single
+  // page of N items returns [[i1, i2, ...]], not [i1, i2, ...]. Flatten one level.
+  return raw.flat();
 }
 
-function buildMilestoneMap(milestones) {
+/**
+ * Build a map of epic number -> milestone title from parsed epics.
+ *
+ * Titles follow the deterministic pattern `Epic N: <title>`, so we derive
+ * the mapping from the in-memory epic data rather than round-tripping
+ * through the GitHub API. This keeps the issue-creation path correct on
+ * a first-run sync, where the locally-fetched milestone list lags behind
+ * milestones we just created.
+ */
+function buildMilestoneMap(epics) {
   const map = new Map();
-  for (const m of milestones) {
-    const match = m.title.match(/^Epic (\d+):/);
-    if (match) map.set(parseInt(match[1], 10), m.title);
-  }
+  for (const e of epics) map.set(e.number, `Epic ${e.number}: ${e.title}`);
   return map;
 }
 
 // --- Create Milestones -------------------------------------------------
 
-/**
- * Create milestones for each epic and return the fetched milestones
- * so callers can reuse them without a redundant API call.
- */
 function createMilestones(epics) {
   console.log('\n--- Milestones ---');
 
@@ -250,8 +254,6 @@ function createMilestones(epics) {
       console.log(`  [created] ${title}`);
     }
   }
-
-  return milestones;
 }
 
 // --- Classify Stories ---------------------------------------------------
@@ -612,9 +614,9 @@ function main() {
     console.log(`Done stories: ${[...doneStories].join(', ')}`);
   }
 
-  const milestones = createMilestones(epics);
+  createMilestones(epics);
   createLabels();
-  const milestoneMap = buildMilestoneMap(milestones);
+  const milestoneMap = buildMilestoneMap(epics);
   const issueMap = createIssues(stories, doneStories, milestoneMap);
 
   if (DRY_RUN) {
@@ -637,4 +639,13 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   }
 }
 
-export { parseEpics, parseDoneStories, classifyStory, buildIssueBody, gh, resolveBmadOutputFolder };
+export {
+  parseEpics,
+  parseDoneStories,
+  classifyStory,
+  buildIssueBody,
+  gh,
+  resolveBmadOutputFolder,
+  fetchMilestones,
+  buildMilestoneMap,
+};
