@@ -1,14 +1,14 @@
 ---
-name: 'story-sync'
-description: 'Reconcile GitHub state with BMAD files - detects merged PRs, marks stories done, cleans up worktrees and branches'
+name: bmad-github-story-sync
+description: 'Reconcile GitHub state with BMAD files — detect merged PRs, mark stories done, clean up worktrees and branches. Use when the user invokes the SS menu code in bmad help, or asks to sync BMAD with GitHub, or just merged a PR and wants BMAD updated.'
 ---
 
 # Story Sync: Reconcile GitHub State → BMAD Files
 
 You are performing a sync operation that makes BMAD files reflect the current state of GitHub Issues.
-**GitHub Issues are the source of truth for story completion.** This command detects merged PRs (which auto-close issues) and propagates that status back to BMAD.
+**GitHub Issues are the source of truth for story completion.** This skill detects merged PRs (which auto-close issues) and propagates that status back to BMAD.
 
-**IMPORTANT:** This command MUST be run from the main repo directory (not a worktree).
+**IMPORTANT:** This skill MUST be run from the main repo directory (not a worktree).
 
 ## Resolve Worktree Root
 
@@ -38,7 +38,7 @@ Read and follow `${CLAUDE_PLUGIN_ROOT}/references/resolve-worktree-root.md`.
 1. **Read the GitHub issue map:**
    Read `<output_folder>/implementation-artifacts/github-issue-map.json`
    - This maps story keys (e.g., `"1-2"`) to GitHub issue numbers and URLs
-   - If the file doesn't exist, tell the user to run `/story-init` first
+   - If the file doesn't exist, tell the user to run Story Init (SI) first
 
 2. **Read sprint-status.yaml:**
    Read `<output_folder>/implementation-artifacts/sprint-status.yaml`

@@ -26,45 +26,58 @@ milestones and PRs. These are concerns that BMAD's module system isn't designed 
 
 ### Installation
 
+This package is **both** a Claude Code plugin *and* a BMAD v6.6+ module — same files serve both ecosystems.
+
+**For Claude Code users:**
+
 ```bash
 /plugin marketplace add choucrifahed/agent-plugins
 /plugin install bmad-github@cfahed
 ```
 
-### Commands
+**For BMAD users (so the commands show up in `bmad help`):**
 
-The plugin provides six slash commands that form a story lifecycle. These commands orchestrate BMAD's **own
-workflows (create-story, dev-story, code-review) under the hood** — if you **update** your BMAD modules, the
+```bash
+npx bmad-method install --custom-source https://github.com/choucrifahed/agent-plugins
+```
+
+You can install one or both — the same six skills get registered.
+
+### Skills
+
+The plugin provides six skills that form a story lifecycle. These skills orchestrate BMAD's **own
+operations (create-story, dev-story, code-review) under the hood** — if you **update** your BMAD modules, the
 plugin **automatically picks up the changes**.
 
-| Command | Description                                                                   |
-|---------|-------------------------------------------------------------------------------|
-| `/story-init` | Batch sync BMAD epics to GitHub — creates milestones, labels, and issues from `epics.md` |
-| `/story-setup-ci` | Install the BMAD Story Sync GitHub Actions workflow into the current project |
-| `/story-create` | Sync GitHub state, then run BMAD create-story workflow to plan a story, marks the GitHub issue in ready |
-| `/story-dev` | Create a git worktree, run BMAD dev-story workflow with auto-commits per task, then create a PR |
-| `/story-review` | Run BMAD adversarial code review and push fixes (does NOT mark story as done) |
-| `/story-sync` | Reconcile GitHub state with BMAD files — detects merged PRs, marks stories done, cleans up worktrees |
+| Invoke | `bmad help` code | Description |
+|--------|------------------|-------------|
+| `/story-init` | `SI`  | Batch sync BMAD epics to GitHub — creates milestones, labels, and issues from `epics.md` |
+| `/story-setup-ci` | `SCI` | Install the BMAD Story Sync GitHub Actions workflow into the current project |
+| `/story-create` | `SC`  | Sync GitHub state, then run BMAD create-story to plan a story; marks the GitHub issue as `ready` |
+| `/story-dev` | `SD`  | Create a git worktree, run BMAD dev-story with auto-commits per task, then create a PR |
+| `/story-review` | `SR`  | Run BMAD adversarial code review and push fixes (does NOT mark story as done) |
+| `/story-sync` | `SS`  | Reconcile GitHub state with BMAD files — detects merged PRs, marks stories done, cleans up worktrees |
+
+In Claude Code, type the slash form (e.g. `/story-dev`) at the prompt. In a BMAD `bmad help` session, type the menu code (e.g. `SD`). Both invoke the same skill.
 
 ### Workflow
 
 ```
-story-init ──► story-create ──► story-dev ──► story-review
-                    │                              │
-                    │         ◄── (fix issues) ◄───┘
-                    │
-                    └──────── story-sync ◄── (user merges PR on GitHub)
+/story-init ──► /story-create ──► /story-dev ──► /story-review
+                      │                                │
+                      │         ◄── (fix issues) ◄─────┘
+                      │
+                      └──────── /story-sync ◄── (user merges PR on GitHub)
 ```
 
 1. **`/story-init`** — Run once to create GitHub milestones and issues from your BMAD epics.
-                       You can also run it everytime you change your roadmap in BMAD to add new issues and milestones
-                       in GitHub.
-1. **`/story-setup-ci`** — Run once to install the GitHub Actions workflow that auto-syncs issue closures to BMAD files.
-2. **`/story-create`** — Pick the next story, run the BMAD planning workflow, update GitHub labels.
-3. **`/story-dev`** — Set up a git worktree, implement the story with granular commits, open a PR.
-4. **`/story-review`** — Run BMAD code review; the story stays at `review` status (not `done`).
-5. The **user** reviews and merges the PR on GitHub (quality gate).
-6. **`/story-sync`** — Detects the merged PR, marks the story as `done` in BMAD, cleans up the worktree and branch.
+                       Also re-run whenever you change your roadmap in BMAD to add new issues and milestones in GitHub.
+2. **`/story-setup-ci`** — Run once to install the GitHub Actions workflow that auto-syncs issue closures to BMAD files.
+3. **`/story-create`** — Pick the next story, run the BMAD planning workflow, update GitHub labels.
+4. **`/story-dev`** — Set up a git worktree, implement the story with granular commits, open a PR.
+5. **`/story-review`** — Run BMAD code review; the story stays at `review` status (not `done`).
+6. The **user** reviews and merges the PR on GitHub (quality gate).
+7. **`/story-sync`** — Detects the merged PR, marks the story as `done` in BMAD, cleans up the worktree and branch.
 
 The user is always the quality gate — no story is marked done without human review and merge. If an issue is closed
 manually (without a merged PR), `/story-sync` will warn and ask the user for feedback rather than marking it done and
@@ -150,13 +163,6 @@ first. `/story-sync` then detects the merge, marks the story done in BMAD, close
 
 Each story gets its own git worktree and branch. Multiple Claude Code agents can work simultaneously — each in its own
 worktree directory, on its own branch — without interfering with each other or the main repo.
-
-### BMAD Companion Module
-
-A companion BMAD extension module is included at `bmad-github/bmad-module/`. It registers the 6 story lifecycle
-workflows in BMAD's help system (phase-4, implementation) so they're discoverable through `bmad help`. The module
-provides discoverability only — execution requires this Claude Code plugin. See
-[bmad-module/README.md](bmad-github/bmad-module/README.md) for installation instructions.
 
 ## License
 

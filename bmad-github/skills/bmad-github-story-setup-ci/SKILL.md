@@ -1,6 +1,6 @@
 ---
-name: story-setup-ci
-description: Install the BMAD Story Sync GitHub Actions workflow into the current project
+name: bmad-github-story-setup-ci
+description: 'Install the BMAD Story Sync GitHub Actions workflow into the current project. Automates marking stories done when issues close on GitHub. Use when the user invokes the SCI menu code in bmad help, or asks to set up CI for BMAD story sync, or asks to install the BMAD story-sync GitHub Action.'
 ---
 
 # Story Setup CI: Install BMAD Story Sync Workflow

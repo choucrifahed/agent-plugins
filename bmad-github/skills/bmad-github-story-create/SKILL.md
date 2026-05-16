@@ -1,17 +1,17 @@
 ---
-name: 'story-create'
-description: 'Sync GitHub state, then run BMAD create-story workflow with full user engagement to plan a story'
+name: bmad-github-story-create
+description: 'Sync GitHub state then plan the next story end-to-end via the BMAD create-story flow. Detects blocking dependencies and updates the GitHub issue label to ready. Use when the user invokes the SC menu code in bmad help, or asks to plan/create the next story, or asks to start the next BMAD story.'
 ---
 
 # Story Create: Sync + BMAD Create-Story
 
-You are creating a new story for development. This command orchestrates two phases:
+You are creating a new story for development. This skill orchestrates two phases:
 1. Sync GitHub state (catch up on merged PRs)
-2. Run the BMAD create-story workflow (creates the story file with full user engagement)
+2. Run the BMAD create-story operation (creates the story file with full user engagement)
 
-After the workflow, the user reviews the output, commits when happy, then runs `/story-dev` to start implementation.
+After the operation, the user reviews the output, commits when happy, then runs Story Dev (SD) to start implementation.
 
-**IMPORTANT:** This command MUST be run from the main repo directory (not a worktree).
+**IMPORTANT:** This skill MUST be run from the main repo directory (not a worktree).
 
 ---
 
@@ -21,11 +21,11 @@ Read and follow `${CLAUDE_PLUGIN_ROOT}/references/sync-first.md`.
 
 ---
 
-## Phase 1: Run BMAD create-story Workflow
+## Phase 1: Run BMAD create-story
 
-Read and follow `${CLAUDE_PLUGIN_ROOT}/references/bmad-workflow-loader.md` with `<workflow-path>` = `_bmad/bmm/workflows/4-implementation/create-story/workflow.yaml`.
+Read and follow `${CLAUDE_PLUGIN_ROOT}/references/bmad-workflow-loader.md` with `<operation>` = `create-story`.
 
-After the workflow completes, note:
+After the operation completes, note:
 - The **story ID** (e.g., `1-2`)
 - The **story key/slug** from the story file name (e.g., `1-2-bridge-interface-and-shared-type-contracts`)
 - The **story title** (e.g., `Bridge Interface & Shared Type Contracts`)
@@ -35,7 +35,7 @@ After the workflow completes, note:
 
 ## Phase 1.5: Check for Blocking Dependencies
 
-After the BMAD workflow completes and the story file is saved, determine whether this story has real dependencies on other incomplete stories in the same epic.
+After the BMAD operation completes and the story file is saved, determine whether this story has real dependencies on other incomplete stories in the same epic.
 
 **The goal is to maximize parallel development** — only block when there is a genuine implementation dependency, not because of sequential numbering.
 
@@ -105,5 +105,5 @@ Next steps:
      git add <output_folder>/implementation-artifacts/
      git commit -m "chore(story): create story <story_id> - <story_key>"
      git push
-  3. Run /story-dev to create a worktree and start implementation
+  3. Start Story Dev (SD) to create a worktree and begin implementation
 ```

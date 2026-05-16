@@ -1,18 +1,18 @@
 ---
-name: 'story-dev'
-description: 'Sync, verify story, create worktree/branch, run BMAD dev-story workflow with auto-commits per task and PR creation'
+name: bmad-github-story-dev
+description: 'Set up a git worktree/branch and run BMAD dev-story end-to-end: auto-commits per task, PR creation, label updates. Use when the user invokes the SD menu code in bmad help, or asks to start implementing the next ready story, or asks to begin dev on a story.'
 ---
 
 # Story Dev: Sync + Verify + Git Setup + BMAD Dev-Story + PR
 
-You are developing a story. This command handles the full lifecycle:
+You are developing a story. This skill handles the full lifecycle:
 1. Sync GitHub state (catch up on merged PRs)
 2. Verify the story file is committed
 3. Set up git worktree and branch
-4. Run the BMAD dev-story workflow with auto-commits
+4. Run the BMAD dev-story operation with auto-commits
 5. Create a PR when development is complete
 
-**IMPORTANT:** This command MUST be run from the main repo directory (not a worktree).
+**IMPORTANT:** This skill MUST be run from the main repo directory (not a worktree).
 
 ---
 
@@ -25,11 +25,11 @@ Read and follow `${CLAUDE_PLUGIN_ROOT}/references/sync-first.md`.
 ## Phase 1: Verify Story
 
 1. **Determine the next story:**
-   Read `<output_folder>/implementation-artifacts/sprint-status.yaml` and find the next story with status `ready-for-dev` (this is the BMAD status set by the create-story workflow).
+   Read `<output_folder>/implementation-artifacts/sprint-status.yaml` and find the next story with status `ready-for-dev` (this is the BMAD status set by the create-story flow).
 
    If no story has `ready-for-dev` status, STOP and tell the user:
    ```
-   No story is ready for development. Run /story-create first to plan a story.
+   No story is ready for development. Start Story Create (SC) first to plan a story.
    ```
 
 2. **Find the story file:**
@@ -37,7 +37,7 @@ Read and follow `${CLAUDE_PLUGIN_ROOT}/references/sync-first.md`.
 
    If the file doesn't exist, STOP and tell the user:
    ```
-   Story file not found. Run /story-create first.
+   Story file not found. Start Story Create (SC) first.
    ```
 
 3. **Verify the story file is committed:**
@@ -50,7 +50,7 @@ Read and follow `${CLAUDE_PLUGIN_ROOT}/references/sync-first.md`.
      git add <output_folder>/implementation-artifacts/
      git commit -m "chore(story): create story <story_id> - <story_key>"
      git push
-   Then re-run /story-dev.
+   Then re-run Story Dev (SD).
    ```
 
 4. **Extract story metadata:**
@@ -61,7 +61,7 @@ Read and follow `${CLAUDE_PLUGIN_ROOT}/references/sync-first.md`.
 5. **Check for blocking dependencies:**
    Look for a `### Blocked By` section in the story file. If found:
    - Extract the story keys listed in the section
-   - Check their **current** status in `sprint-status.yaml` (statuses may have changed since `/story-create` ran)
+   - Check their **current** status in `sprint-status.yaml` (statuses may have changed since Story Create ran)
    - If ALL listed stories are now `done`, continue — the dependencies have been completed
    - If any are still NOT `done`, STOP and tell the user:
      ```
@@ -72,7 +72,7 @@ Read and follow `${CLAUDE_PLUGIN_ROOT}/references/sync-first.md`.
      Required stories not yet completed:
        - <story_key> (status: <current_status>)
 
-     Complete these stories first, then re-run /story-dev.
+     Complete these stories first, then re-run Story Dev (SD).
      ```
 
 ---
@@ -151,11 +151,11 @@ cd <worktree-root>/story-<story_key>/
 
 ---
 
-## Phase 3: Run BMAD dev-story Workflow
+## Phase 3: Run BMAD dev-story
 
-Read and follow `${CLAUDE_PLUGIN_ROOT}/references/bmad-workflow-loader.md` with `<workflow-path>` = `_bmad/bmm/workflows/4-implementation/dev-story/workflow.yaml`.
+Read and follow `${CLAUDE_PLUGIN_ROOT}/references/bmad-workflow-loader.md` with `<operation>` = `dev-story`.
 
-### Auto-Commit Instruction (Layer on top of BMAD workflow)
+### Auto-Commit Instruction (Layer on top of BMAD dev-story)
 
 **After each task is marked `[x]` in the story file and the story file is saved**, also run:
 
@@ -183,7 +183,7 @@ This creates **granular commits per task** — much better for PR review than a 
 
 ## Phase 4: Create PR (After All Tasks Complete)
 
-After the BMAD workflow completes and the story status is `review`:
+After the BMAD dev-story operation completes and the story status is `review`:
 
 ### Step 1: Push the branch
 ```
@@ -269,6 +269,6 @@ Labels:  <shared label set>
 Commits: <count> commits created during development
 
 Next steps:
-  1. Run /story-review in this worktree for code review
+  1. Start Story Review (SR) in this worktree for code review
   2. Or, the user can review the PR directly on GitHub
 ```
