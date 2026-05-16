@@ -1,6 +1,6 @@
 ---
-name: 'story-init'
-description: 'Batch sync BMAD epics to GitHub — creates milestones, labels, and issues from epics.md'
+name: bmad-github-story-init
+description: 'Batch sync BMAD epics to GitHub — creates milestones, labels, and issues from epics.md. Idempotent: safe to re-run when epics change. Use when the user invokes the SI menu code in bmad help, or asks to bootstrap GitHub from epics, or asks to sync BMAD epics to GitHub.'
 ---
 
 # Story Init: Batch Sync BMAD Epics → GitHub
@@ -9,7 +9,7 @@ You are running the initial (or re-sync) batch operation that creates GitHub Mil
 
 This is **idempotent** — safe to re-run. It checks for existing milestones/issues before creating new ones.
 
-**IMPORTANT:** This command MUST be run from the main repo directory (not a worktree).
+**IMPORTANT:** This skill MUST be run from the main repo directory (not a worktree).
 
 ---
 
@@ -99,8 +99,8 @@ Issues:     <count> stories synced
 Map:        <output_folder>/implementation-artifacts/github-issue-map.json
 
 Next steps:
-  1. Run /story-create to pick a story and start development
-  2. Run /story-sync to reconcile GitHub state with BMAD files
+  1. Start Story Create (SC) to pick a story and begin planning
+  2. Start Story Sync (SS) to reconcile GitHub state with BMAD files
 ```
 
 If `--dry-run` was used, remind the user that no changes were made.

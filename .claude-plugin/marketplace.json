@@ -11,7 +11,7 @@
       "name": "bmad-github",
       "source": "./bmad-github",
       "description": "BMAD + GitHub story workflow with git worktrees for parallel agent development",
-      "version": "1.0.2",
+      "version": "1.0.3",
       "author": {
         "name": "Choucri Fahed"
       },

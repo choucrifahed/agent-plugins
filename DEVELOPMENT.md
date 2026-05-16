@@ -55,7 +55,7 @@ The version must be consistent across all three files:
 |------|-------|
 | `.claude-plugin/marketplace.json` | `plugins[0].version` |
 | `bmad-github/.claude-plugin/plugin.json` | `version` |
-| `bmad-github/bmad-module/src/module.yaml` | `version` |
+| `bmad-github/module.yaml` | `version` |
 
 When releasing a new version, update all three files to the same semver value.
 
@@ -65,34 +65,32 @@ When releasing a new version, update all three files to the same semver value.
 agent-plugins/
 ├── .claude-plugin/
 │   └── marketplace.json          # Marketplace manifest (plugin registry)
-├── bmad-github/                  # The bmad-github plugin
+├── bmad-github/                  # The bmad-github plugin (also a BMAD v6.6+ module)
 │   ├── .claude-plugin/
-│   │   └── plugin.json           # Plugin manifest
-│   ├── commands/                 # Slash commands (5 story lifecycle commands)
-│   │   ├── story-init.md
-│   │   ├── story-create.md
-│   │   ├── story-dev.md
-│   │   ├── story-review.md
-│   │   └── story-sync.md
+│   │   └── plugin.json           # Claude Code plugin manifest
+│   ├── module.yaml               # BMAD module manifest
+│   ├── module-help.csv           # BMAD help entries (SI/SC/SD/SR/SS/SCI)
+│   ├── skills/                   # Six story-lifecycle skills (canonical content)
+│   │   ├── bmad-github-story-init/SKILL.md
+│   │   ├── bmad-github-story-create/SKILL.md
+│   │   ├── bmad-github-story-dev/SKILL.md
+│   │   ├── bmad-github-story-review/SKILL.md
+│   │   ├── bmad-github-story-sync/SKILL.md
+│   │   └── bmad-github-story-setup-ci/SKILL.md
+│   ├── references/               # Shared instructions (workflow loader, sync helper, etc.)
 │   ├── hooks/                    # Event hooks
 │   │   ├── hooks.json            # Hook configuration
 │   │   └── scripts/
 │   │       └── session-start.sh  # Injects BMAD output folder convention
-│   ├── scripts/
-│   │   └── sync-stories-to-github.mjs  # Batch sync script (Node.js)
-│   └── bmad-module/              # Companion BMAD extension module
-│       ├── README.md
-│       └── src/
-│           ├── module.yaml       # BMAD module manifest
-│           └── module-help.csv   # BMAD help system entries
+│   └── scripts/
+│       └── sync-stories-to-github.mjs  # Batch sync script (Node.js)
 ├── tests/
 │   └── bmad-github/
 │       └── sync-stories-to-github.test.mjs
 ├── package.json
 ├── biome.json
 ├── README.md                     # User-facing documentation
-├── DEVELOPMENT.md                # This file
-└── bmad-module.md                # Enhancement plan and analysis
+└── DEVELOPMENT.md                # This file
 ```
 
 ## Adding a New Plugin
