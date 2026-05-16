@@ -11,7 +11,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   buildIssueBody,
+  buildMilestoneMap,
   classifyStory,
+  fetchMilestones,
   gh,
   parseDoneStories,
   parseEpics,
@@ -537,5 +539,69 @@ describe('resolveBmadOutputFolder', () => {
     writeFileSync(join(tempDir, '_bmad/bmm/config.yaml'), 'output_folder: /absolute/path\n');
     const result = resolveBmadOutputFolder(tempDir);
     expect(result).toBe('/absolute/path');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// fetchMilestones — regression for `gh api --paginate --slurp` array-of-arrays
+// ---------------------------------------------------------------------------
+
+describe('fetchMilestones', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('flattens a single empty page ([[]] -> [])', () => {
+    execFileSync.mockReturnValue('[[]]');
+    expect(fetchMilestones()).toEqual([]);
+  });
+
+  it('flattens a single page with one item', () => {
+    execFileSync.mockReturnValue('[[{"title":"Epic 1: x"}]]');
+    expect(fetchMilestones()).toEqual([{ title: 'Epic 1: x' }]);
+  });
+
+  it('flattens multiple pages into a single array', () => {
+    execFileSync.mockReturnValue(
+      '[[{"title":"Epic 1: a"},{"title":"Epic 2: b"}],[{"title":"Epic 3: c"}]]',
+    );
+    const result = fetchMilestones();
+    expect(result).toHaveLength(3);
+    expect(result.map((m) => m.title)).toEqual(['Epic 1: a', 'Epic 2: b', 'Epic 3: c']);
+  });
+
+  it('throws a descriptive error when the API does not return an array', () => {
+    execFileSync.mockReturnValue('{"message":"Not Found"}');
+    expect(() => fetchMilestones()).toThrow(/Expected array of milestones/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildMilestoneMap — derives mapping from parsed epics, not from gh API
+// ---------------------------------------------------------------------------
+
+describe('buildMilestoneMap', () => {
+  it('returns an empty map for no epics', () => {
+    expect(buildMilestoneMap([])).toEqual(new Map());
+  });
+
+  it('maps epic number to the deterministic milestone title', () => {
+    const epics = [
+      { number: 1, title: 'Setup' },
+      { number: 2, title: 'Core Features' },
+    ];
+    const map = buildMilestoneMap(epics);
+    expect(map.get(1)).toBe('Epic 1: Setup');
+    expect(map.get(2)).toBe('Epic 2: Core Features');
+    expect(map.size).toBe(2);
+  });
+
+  it('produces titles that match createMilestones output, so issue creation can attach them on first run', () => {
+    // Regression for Bug 2: the previous implementation built the map from a
+    // pre-creation fetch of milestones, which was empty on a clean repo and
+    // caused every issue to be created without a milestone.
+    const epics = [{ number: 7, title: 'Something' }];
+    const expected = `Epic ${epics[0].number}: ${epics[0].title}`;
+    expect(buildMilestoneMap(epics).get(7)).toBe(expected);
   });
 });
