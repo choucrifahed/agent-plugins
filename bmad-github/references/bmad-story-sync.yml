@@ -20,35 +20,24 @@ jobs:
         with:
           ref: main
 
-      - name: Resolve BMAD output folder
+      - name: Resolve BMAD implementation artifacts directory
         id: bmad-config
         run: |
-          CONFIG=""
-          for candidate in "_bmad/bmm/config.yaml" "_bmad/bmb/config.yaml"; do
-            if [ -f "$candidate" ]; then
-              CONFIG="$candidate"
-              break
-            fi
-          done
-          if [ -z "$CONFIG" ]; then
-            echo "::warning::BMAD config not found. Defaulting to _bmad-output."
-            OUTPUT_FOLDER="_bmad-output"
-          else
-            RAW=$(grep '^output_folder:' "$CONFIG" | sed 's/output_folder: *//' | sed 's/"//g')
-            # Strip {project-root}/ since we're already at repo root
-            OUTPUT_FOLDER=$(echo "$RAW" | sed 's|{project-root}/||' | sed 's|{project-root}||')
+          if [ ! -f _bmad/config.toml ]; then
+            echo "::error::_bmad/config.toml not found at repo root."
+            exit 1
           fi
-          echo "output_folder=$OUTPUT_FOLDER" >> "$GITHUB_OUTPUT"
-          echo "Resolved output folder: $OUTPUT_FOLDER"
+          ARTIFACTS=$(python3 -c "import tomllib; cfg=tomllib.load(open('_bmad/config.toml','rb')); print(cfg['modules']['bmm']['implementation_artifacts'].replace('{project-root}','').lstrip('/'))")
+          echo "artifacts=$ARTIFACTS" >> "$GITHUB_OUTPUT"
+          echo "Resolved artifacts directory: $ARTIFACTS"
 
       - name: Sync closed issue to BMAD
         env:
           GH_TOKEN: ${{ github.token }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          OUTPUT_FOLDER: ${{ steps.bmad-config.outputs.output_folder }}
+          ARTIFACTS: ${{ steps.bmad-config.outputs.artifacts }}
         run: |
-          ARTIFACTS="$OUTPUT_FOLDER/implementation-artifacts"
           ISSUE_MAP="$ARTIFACTS/github-issue-map.json"
           SPRINT_STATUS="$ARTIFACTS/sprint-status.yaml"
 
@@ -142,6 +131,8 @@ jobs:
       - name: Commit and push
         if: env.CHANGES == 'true'
         run: |
+          # Canonical github-actions[bot] identity — 41898282 is the bot's user ID.
+          # This exact pair is what makes commits show as authored by the bot in the UI; do not "fix" it.
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add "$ARTIFACTS/"
