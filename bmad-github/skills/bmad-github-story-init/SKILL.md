@@ -28,10 +28,12 @@ This is **idempotent** — safe to re-run. It checks for existing milestones/iss
    Confirm the path matches the main repo root.
 
 3. **Verify BMAD files exist:**
-   - `<output_folder>/planning-artifacts/epics.md` — the source of truth for epics and stories
-   - `<output_folder>/implementation-artifacts/sprint-status.yaml` — tracks story statuses
+   - `<output_folder>/planning-artifacts/epics.md` — **required** — the source of truth for epics and stories
+   - `<output_folder>/implementation-artifacts/sprint-status.yaml` — **optional** — if present, stories already at 
+     status `done` get their GitHub issues pre-closed during sync
 
-   If either file is missing, STOP and tell the user which file is needed.
+   If `epics.md` is missing, STOP and tell the user to run the BMAD planning workflow first. If `sprint-status.yaml` is 
+   missing, continue — the sync script handles its absence by skipping done-story detection.
 
 4. **Verify you are on the `main` branch:**
    ```
