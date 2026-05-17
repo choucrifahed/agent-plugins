@@ -1,17 +1,27 @@
 ---
 name: bmad-github-story-create
-description: 'Sync GitHub state then plan the next story end-to-end via the BMAD create-story flow. Detects blocking dependencies and updates the GitHub issue label to ready. Use when the user invokes the SC menu code in bmad help, or asks to plan/create the next story, or asks to start the next BMAD story.'
+description: 'Sync GitHub state then plan the next story end-to-end via the BMAD create-story flow. Detects blocking dependencies via GitHub labels and updates the GitHub issue label to ready. Use when the user invokes the SC menu code in bmad help, or asks to plan/create the next story, or asks to start the next BMAD story.'
 ---
 
 # Story Create: Sync + BMAD Create-Story
 
 You are creating a new story for development. This skill orchestrates two phases:
-1. Sync GitHub state (catch up on merged PRs)
+1. Sync local state (lightweight refresh)
 2. Run the BMAD create-story operation (creates the story file with full user engagement)
 
 After the operation, the user reviews the output, commits when happy, then runs Story Dev (SD) to start implementation.
 
-**IMPORTANT:** This skill MUST be run from the main repo directory (not a worktree).
+## Worktree behavior
+
+This skill writes a new file into `<output_folder>/implementation-artifacts/` on whichever branch is currently checked out.
+It can run from `main` or from any worktree, but be aware:
+
+- **From `main` (recommended for the standard sequential flow):** the new story file is committed on `main`, and any
+  subsequent `/story-dev` worktree branches from a `main` that already has the file.
+- **From a worktree on some other branch** (e.g., Conductor spawned you in a planning worktree): the new story file
+  lands on *that* branch. You must merge it to `main` before another agent's `/story-dev` can see it.
+
+If you're unsure where you are, run `git branch --show-current` and decide based on the branch name.
 
 ---
 
@@ -31,6 +41,10 @@ After the operation completes, note:
 - The **story title** (e.g., `Bridge Interface & Shared Type Contracts`)
 - The **story file path** in `<output_folder>/implementation-artifacts/`
 
+If BMAD halts because `sprint-status.yaml` is missing (this can happen if the project has never been sprint-planned, or
+you're on a branch where the file hasn't been merged yet), tell the user to either run BMAD `sprint-planning` or pass
+an explicit `<epic>-<story>` identifier (e.g., `1-2`) to `create-story` to bypass auto-discovery.
+
 ---
 
 ## Phase 1.5: Check for Blocking Dependencies
@@ -39,9 +53,16 @@ After the BMAD operation completes and the story file is saved, determine whethe
 
 **The goal is to maximize parallel development** — only block when there is a genuine implementation dependency, not because of sequential numbering.
 
-1. **Identify candidate stories:**
-   Extract the epic number from the story ID (e.g., `1-3` → epic 1).
-   Find all other stories in the same epic that are NOT `done` in `sprint-status.yaml` (excluding the current story).
+1. **Identify candidate stories from GitHub** (authoritative status source):
+   - Extract the epic number from the story ID (e.g., `1-3` → epic `1`).
+   - Read `<output_folder>/implementation-artifacts/github-issue-map.json` and collect all entries whose key starts with `<epic_num>-` (excluding the current story).
+   - For each `(story_key, issue_number)` pair, query the issue's current status label:
+     ```
+     gh issue view <issue_number> --json number,title,labels --jq '{n:.number, key:"<story_key>", labels:[.labels[].name]}'
+     ```
+   - Treat any story whose labels contain `status:done` as completed. All others are candidates for dependency analysis.
+
+   **Fallback:** if GitHub is unreachable, read `<output_folder>/implementation-artifacts/sprint-status.yaml` and treat statuses there as a stale view. Note the staleness in the final report.
 
 2. **Analyze for real dependencies:**
    Read the story file you just created — look at the implementation details: packages modified, types/APIs consumed, files touched, build dependencies, and task descriptions.
@@ -59,7 +80,7 @@ After the BMAD operation completes and the story file is saved, determine whethe
    - Stories work on independent features within the same package
    - Sequential numbering alone (1-2 does not automatically require 1-1)
 
-3. **If any genuine blocking dependencies exist and are NOT `done`**, add a `### Blocked By` section at the very beginning of the `## Dev Notes` section in the story file:
+3. **If any genuine blocking dependencies exist and are NOT `status:done`**, add a `### Blocked By` section at the very beginning of the `## Dev Notes` section in the story file:
 
    Example (for story 1-3 that depends on types from 1-2):
    ```markdown
@@ -67,12 +88,12 @@ After the BMAD operation completes and the story file is saved, determine whethe
 
    ### Blocked By
    > **This story cannot start development until the following stories are completed:**
-   > - 1-2-bridge-interface-and-shared-type-contracts (status: in-progress)
+   > - 1-2-bridge-interface-and-shared-type-contracts (current label: status:in-progress)
    >   Reason: This story imports the Bridge interface and ThemeTokens type defined in story 1-2.
    ```
 
-   - List ONLY stories that are genuine dependencies AND are NOT `done`
-   - Use the full story key from sprint-status.yaml with current status in parentheses
+   - List ONLY stories that are genuine dependencies AND are NOT `status:done`
+   - Use the full story key from `github-issue-map.json` with the current GitHub label in parentheses
    - Include a brief reason explaining the dependency
    - If there are NO real blocking dependencies, do NOT add this section
 
@@ -98,6 +119,7 @@ Print a clear summary:
 Story:     <story_id> - <story_title>
 File:      <output_folder>/implementation-artifacts/<story-file>.md
 Issue:     #<number> (<url>) — status:ready
+Branch:    <current branch>
 
 Next steps:
   1. Review the story file and make any edits you want
@@ -105,5 +127,10 @@ Next steps:
      git add <output_folder>/implementation-artifacts/
      git commit -m "chore(story): create story <story_id> - <story_key>"
      git push
-  3. Start Story Dev (SD) to create a worktree and begin implementation
+  3. If you created this on a non-main branch, merge it to main before any
+     parallel agent runs Story Dev — otherwise their worktree (branched
+     from main) will not see the new story file.
+  4. Start Story Dev (SD) to create a worktree and begin implementation.
+     (SD also works from inside an existing Conductor-spawned worktree on
+     a story/<key> branch — it will reuse that worktree.)
 ```

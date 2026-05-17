@@ -49,14 +49,14 @@ The plugin provides six skills that form a story lifecycle. These skills orchest
 operations (create-story, dev-story, code-review) under the hood** — if you **update** your BMAD modules, the
 plugin **automatically picks up the changes**.
 
-| Invoke | `bmad help` code | Description |
-|--------|------------------|-------------|
-| `/story-init` | `SI`  | Batch sync BMAD epics to GitHub — creates milestones, labels, and issues from `epics.md` |
-| `/story-setup-ci` | `SCI` | Install the BMAD Story Sync GitHub Actions workflow into the current project |
-| `/story-create` | `SC`  | Sync GitHub state, then run BMAD create-story to plan a story; marks the GitHub issue as `ready` |
-| `/story-dev` | `SD`  | Create a git worktree, run BMAD dev-story with auto-commits per task, then create a PR |
-| `/story-review` | `SR`  | Run BMAD adversarial code review and push fixes (does NOT mark story as done) |
-| `/story-sync` | `SS`  | Reconcile GitHub state with BMAD files — detects merged PRs, marks stories done, cleans up worktrees |
+| Invoke | `bmad help` code | Branch | Description |
+|--------|------------------|--------|-------------|
+| `/story-init` | `SI`  | `main` | Batch sync BMAD epics to GitHub — creates milestones, labels, and issues from `epics.md` |
+| `/story-setup-ci` | `SCI` | `main` | Install the BMAD Story Sync GitHub Actions workflow (redundant safety net that writes `sprint-status.yaml` on issue close) |
+| `/story-create` | `SC`  | `main` (recommended) or any worktree | Run BMAD create-story to plan a story; dependency check via GitHub labels; marks the GitHub issue `status:ready` |
+| `/story-dev` | `SD`  | `main` *or* a `story/<key>` worktree | Pick a ready story (or use the current worktree's branch), flip the GitHub label to `in-progress`, create or reuse a worktree, run BMAD dev-story with auto-commits, open a PR |
+| `/story-review` | `SR`  | `story/<key>` worktree | Run BMAD adversarial code review and push fixes (does NOT mark story as done) |
+| `/story-sync` | `SS`  | `main` | Reconcile BMAD files with GitHub on `main` (writes `sprint-status.yaml`, story file `Status:` lines, GH labels, epic promotion) and clean up worktrees/branches for completed stories |
 
 In Claude Code, type the slash form (e.g. `/story-dev`) at the prompt. In a BMAD `bmad help` session, type the menu code (e.g. `SD`). Both invoke the same skill.
 
@@ -70,18 +70,11 @@ In Claude Code, type the slash form (e.g. `/story-dev`) at the prompt. In a BMAD
                       └──────── /story-sync ◄── (user merges PR on GitHub)
 ```
 
-1. **`/story-init`** — Run once to create GitHub milestones and issues from your BMAD epics.
-                       Also re-run whenever you change your roadmap in BMAD to add new issues and milestones in GitHub.
-2. **`/story-setup-ci`** — Run once to install the GitHub Actions workflow that auto-syncs issue closures to BMAD files.
-3. **`/story-create`** — Pick the next story, run the BMAD planning workflow, update GitHub labels.
-4. **`/story-dev`** — Set up a git worktree, implement the story with granular commits, open a PR.
-5. **`/story-review`** — Run BMAD code review; the story stays at `review` status (not `done`).
-6. The **user** reviews and merges the PR on GitHub (quality gate).
-7. **`/story-sync`** — Detects the merged PR, marks the story as `done` in BMAD, cleans up the worktree and branch.
+Re-run `/story-init` whenever you add or rename epics. `/story-setup-ci` is optional but recommended — it installs a 
+GitHub Actions workflow that performs the same writes as `/story-sync` whenever a PR closes its issue.
 
-The user is always the quality gate — no story is marked done without human review and merge. If an issue is closed
-manually (without a merged PR), `/story-sync` will warn and ask the user for feedback rather than marking it done and
-cleaning up the worktree.
+The user is always the quality gate — no story is marked `done` without a human-merged PR. If an issue is closed without
+a merged PR, `/story-sync` warns rather than silently cleaning up the worktree.
 
 ### Configuration
 
@@ -152,17 +145,18 @@ status label is removed and the new one is added:
 |---|---|---|---|
 | *(initial)* | `status:backlog` | `/story-init` | Applied at issue creation |
 | ready-for-dev | `status:ready` | `/story-create` | Story has been planned |
-| in-progress | `status:in-progress` | `/story-dev` | Worktree created, development started |
+| in-progress | `status:in-progress` | `/story-dev` | Worktree created or reused; development started |
 | review | `status:review` | `/story-dev` | PR created; `/story-review` keeps this status |
-| done | `status:done` | `/story-sync` | Issue is also closed |
+| done | `status:done` | `/story-sync` on `main` (and/or `bmad-story-sync` CI on PR merge — idempotent) | Issue is also closed |
 
-The `/story-review` command intentionally does **not** advance status to `done` — the user must merge the PR on GitHub
-first. `/story-sync` then detects the merge, marks the story done in BMAD, closes the issue, and cleans up the worktree.
+`/story-review` deliberately stops at `review` — only merging the PR advances a story to `done`.
 
 ### Parallel Development
 
-Each story gets its own git worktree and branch. Multiple Claude Code agents can work simultaneously — each in its own
-worktree directory, on its own branch — without interfering with each other or the main repo.
+Each story runs in its own git worktree on its own branch, so multiple agents can work in parallel without colliding.
+`/story-dev` creates a worktree from `main`, or reuses one if you're already inside a `story/<key>` branch — so it
+composes cleanly with orchestrators like [Conductor](https://conductor.build/) that spawn each agent in a pre-created
+worktree.
 
 ## License
 
