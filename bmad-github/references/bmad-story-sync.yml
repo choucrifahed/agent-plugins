@@ -69,9 +69,34 @@ jobs:
             exit 0
           fi
 
-          # 3. Verify a merged PR exists for this issue
-          MERGED_PR=$(gh pr list --search "#$ISSUE_NUMBER" --state merged \
-            --json number --jq '.[0].number // empty' --limit 5)
+          # 3. Find the PR that closed this issue.
+          # Uses canonical event data (issue timeline), NOT the search index, which is
+          # eventually consistent and reliably stale 5–30 s after a merge — the exact
+          # window in which the `issues.closed` webhook fires.
+          MERGED_PR=$(gh api graphql \
+            -F owner="${GITHUB_REPOSITORY%%/*}" \
+            -F repo="${GITHUB_REPOSITORY##*/}" \
+            -F num="$ISSUE_NUMBER" \
+            -f query='
+              query($owner: String!, $repo: String!, $num: Int!) {
+                repository(owner: $owner, name: $repo) {
+                  issue(number: $num) {
+                    timelineItems(itemTypes: [CLOSED_EVENT], last: 1) {
+                      nodes {
+                        ... on ClosedEvent {
+                          closer {
+                            __typename
+                            ... on PullRequest { number state }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }' \
+            --jq '.data.repository.issue.timelineItems.nodes[0].closer
+                  | select(.__typename == "PullRequest" and .state == "MERGED")
+                  | .number // empty')
 
           if [ -z "$MERGED_PR" ]; then
             echo "::warning::Issue #$ISSUE_NUMBER (story $STORY_KEY) closed without a merged PR. Skipping."
