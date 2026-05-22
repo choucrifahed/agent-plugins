@@ -1,7 +1,7 @@
 code: bmad-github
 name: "GitHub Story Workflow"
 description: "BMAD + GitHub story lifecycle: init, create, dev, review, sync, setup-ci. Provides 6 implementation-phase skills that bridge BMAD workflows with GitHub issues, milestones, labels, PRs, and worktrees for parallel agent development."
-version: "1.1.1"
+version: "1.1.2"
 default_selected: false
 
 worktree_root:
