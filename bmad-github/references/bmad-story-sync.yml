@@ -11,6 +11,7 @@ concurrency:
 permissions:
   contents: write
   issues: write
+  pull-requests: read
 
 jobs:
   sync:
@@ -166,5 +167,8 @@ jobs:
             exit 0
           fi
           git commit -m "chore(sync): mark story $STORY_KEY done (PR #$MERGED_PR)"
-          git pull --rebase
+          # --autostash: LFS-tracked files under docs/reference-data/** are checked
+          # out as pointers (no lfs: true), so the index sees them as unstaged. The
+          # rebase needs a clean tree even though those changes are unrelated.
+          git pull --rebase --autostash
           git push
