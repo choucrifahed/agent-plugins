@@ -2,6 +2,21 @@
 
 A Claude Code plugin marketplace for agent-driven development workflows.
 
+## hermes-tweet
+
+Native Hermes Agent X/Twitter plugin with read-first workflows and
+approval-gated actions.
+
+```bash
+hermes plugins install Xquik-dev/hermes-tweet --enable
+```
+
+See [`hermes-tweet/README.md`](hermes-tweet/README.md) for install notes and
+runtime gating.
+
+Xquik is an independent third-party service. Not affiliated with X Corp.
+"Twitter" and "X" are trademarks of X Corp.
+
 ## bmad-github
 
 BMAD + GitHub story workflow orchestration with git worktrees for parallel agent development.
@@ -12,7 +27,7 @@ management, auto-commits per task, and PR creation.
 
 ### Why a Claude Code plugin?
 
-BMAD modules are conversational guides — they tell the AI *what to do* step by step. This plugin operates at the
+BMAD modules are conversational guides - they tell the AI *what to do* step by step. This plugin operates at the
 **runtime/DevOps layer**, orchestrating those same BMAD workflows while managing `gh`, `git worktree`, branches, labels,
 milestones and PRs. These are concerns that BMAD's module system isn't designed to handle.
 
@@ -26,7 +41,7 @@ milestones and PRs. These are concerns that BMAD's module system isn't designed 
 
 ### Installation
 
-This package is **both** a Claude Code plugin *and* a BMAD v6.6+ module — same files serve both ecosystems.
+This package is **both** a Claude Code plugin *and* a BMAD v6.6+ module - same files serve both ecosystems.
 
 **For Claude Code users:**
 
@@ -41,17 +56,17 @@ This package is **both** a Claude Code plugin *and* a BMAD v6.6+ module — same
 npx bmad-method install --custom-source https://github.com/choucrifahed/agent-plugins
 ```
 
-You can install one or both — the same six skills get registered.
+You can install one or both - the same six skills get registered.
 
 ### Skills
 
 The plugin provides six skills that form a story lifecycle. These skills orchestrate BMAD's **own
-operations (create-story, dev-story, code-review) under the hood** — if you **update** your BMAD modules, the
+operations (create-story, dev-story, code-review) under the hood** - if you **update** your BMAD modules, the
 plugin **automatically picks up the changes**.
 
 | Invoke | `bmad help` code | Branch | Description |
 |--------|------------------|--------|-------------|
-| `/story-init` | `SI`  | `main` | Batch sync BMAD epics to GitHub — creates milestones, labels, and issues from `epics.md` |
+| `/story-init` | `SI`  | `main` | Batch sync BMAD epics to GitHub - creates milestones, labels, and issues from `epics.md` |
 | `/story-setup-ci` | `SCI` | `main` | Install the BMAD Story Sync GitHub Actions workflow (redundant safety net that writes `sprint-status.yaml` on issue close) |
 | `/story-create` | `SC`  | `main` (recommended) or any worktree | Run BMAD create-story to plan a story; dependency check via GitHub labels; marks the GitHub issue `status:ready` |
 | `/story-dev` | `SD`  | `main` *or* a `story/<key>` worktree | Pick a ready story (or use the current worktree's branch), flip the GitHub label to `in-progress`, create or reuse a worktree, run BMAD dev-story with auto-commits, open a PR |
@@ -70,10 +85,10 @@ In Claude Code, type the slash form (e.g. `/story-dev`) at the prompt. In a BMAD
                       └──────── /story-sync ◄── (user merges PR on GitHub)
 ```
 
-Re-run `/story-init` whenever you add or rename epics. `/story-setup-ci` is optional but recommended — it installs a 
+Re-run `/story-init` whenever you add or rename epics. `/story-setup-ci` is optional but recommended - it installs a
 GitHub Actions workflow that performs the same writes as `/story-sync` whenever a PR closes its issue.
 
-The user is always the quality gate — no story is marked `done` without a human-merged PR. If an issue is closed without
+The user is always the quality gate - no story is marked `done` without a human-merged PR. If an issue is closed without
 a merged PR, `/story-sync` warns rather than silently cleaning up the worktree.
 
 ### Configuration
@@ -100,7 +115,7 @@ If no config is found, it defaults to `_bmad-output`. This makes the plugin port
 ### Epics → Milestones
 
 Each BMAD epic from `<output_folder>/planning-artifacts/epics.md` becomes a GitHub milestone titled `Epic <N>: <Title>` 
-(e.g., `Epic 1: Core Infrastructure`). Creation is idempotent — existing milestones are skipped. Every story issue is 
+(e.g., `Epic 1: Core Infrastructure`). Creation is idempotent - existing milestones are skipped. Every story issue is
 assigned to the milestone matching its epic number.
 
 ### Labels
@@ -147,14 +162,14 @@ status label is removed and the new one is added:
 | ready-for-dev | `status:ready` | `/story-create` | Story has been planned |
 | in-progress | `status:in-progress` | `/story-dev` | Worktree created or reused; development started |
 | review | `status:review` | `/story-dev` | PR created; `/story-review` keeps this status |
-| done | `status:done` | `/story-sync` on `main` (and/or `bmad-story-sync` CI on PR merge — idempotent) | Issue is also closed |
+| done | `status:done` | `/story-sync` on `main` (and/or `bmad-story-sync` CI on PR merge - idempotent) | Issue is also closed |
 
-`/story-review` deliberately stops at `review` — only merging the PR advances a story to `done`.
+`/story-review` deliberately stops at `review` - only merging the PR advances a story to `done`.
 
 ### Parallel Development
 
 Each story runs in its own git worktree on its own branch, so multiple agents can work in parallel without colliding.
-`/story-dev` creates a worktree from `main`, or reuses one if you're already inside a `story/<key>` branch — so it
+`/story-dev` creates a worktree from `main`, or reuses one if you're already inside a `story/<key>` branch - so it
 composes cleanly with orchestrators like [Conductor](https://conductor.build/) that spawn each agent in a pre-created
 worktree.
 

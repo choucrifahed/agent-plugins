@@ -37,7 +37,7 @@ function resolveBmadOutputFolder(root) {
   const configPath = join(root, '_bmad/bmm/config.yaml');
   try {
     const content = readFileSync(configPath, 'utf-8');
-    // Match "output_folder: <value>" — handles quoted and unquoted values,
+    // Match "output_folder: <value>" - handles quoted and unquoted values,
     // and resolves {project-root} placeholder to the actual root.
     const match = content.match(/^output_folder:\s*['"]?(.+?)['"]?\s*$/m);
     if (match) {
@@ -46,7 +46,7 @@ function resolveBmadOutputFolder(root) {
       return raw.startsWith('/') ? raw : join(root, raw);
     }
   } catch {
-    // Config file doesn't exist or isn't readable — use default
+    // Config file doesn't exist or isn't readable - use default
   }
   return join(root, DEFAULT_OUTPUT_FOLDER);
 }
@@ -59,7 +59,7 @@ const MAP_PATH = join(OUTPUT_FOLDER, 'implementation-artifacts/github-issue-map.
 // --- Helpers -----------------------------------------------------------
 
 /**
- * Run a `gh` CLI command. Args must be an array — no string interpolation,
+ * Run a `gh` CLI command. Args must be an array - no string interpolation,
  * no shell interpretation, no quoting hazards.
  */
 function gh(argList, { json = false, ignoreError = false, readOnly = false, input } = {}) {
@@ -140,7 +140,7 @@ function parseEpics(content) {
 
     if (!currentStory) continue;
 
-    // User story lines (As a / I want / So that) — plain or bold
+    // User story lines (As a / I want / So that) - plain or bold
     if (/^(?:\*\*)?(As an?|I want|So that)\b/i.test(line)) {
       currentStory.userStory.push(line.trim());
       continue;
@@ -455,7 +455,7 @@ function createIssues(stories, doneStories, milestoneMap) {
         continue;
       }
 
-      // Build args array — no string interpolation, no quoting hazards
+      // Build args array - no string interpolation, no quoting hazards
       const milestoneTitle = milestoneMap.get(story.epicNumber);
       if (!milestoneTitle) {
         console.warn(
@@ -476,7 +476,7 @@ function createIssues(stories, doneStories, milestoneMap) {
         '-',
       ];
 
-      // Pipe body via stdin — no temp files
+      // Pipe body via stdin - no temp files
       const body = buildIssueBody(story);
       const issueUrl = gh(args, { input: body });
 
@@ -640,12 +640,12 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
 }
 
 export {
-  parseEpics,
-  parseDoneStories,
-  classifyStory,
   buildIssueBody,
-  gh,
-  resolveBmadOutputFolder,
-  fetchMilestones,
   buildMilestoneMap,
+  classifyStory,
+  fetchMilestones,
+  gh,
+  parseDoneStories,
+  parseEpics,
+  resolveBmadOutputFolder,
 };

@@ -18,6 +18,19 @@
       "repository": "https://github.com/choucrifahed/agent-plugins",
       "license": "MIT",
       "keywords": ["bmad", "github", "stories", "worktrees", "project-management", "issues", "milestones", "labels"]
+    },
+    {
+      "name": "hermes-tweet",
+      "source": "./hermes-tweet",
+      "description": "Native Hermes Agent X/Twitter plugin with read-first workflows and approval-gated actions. Not affiliated with X Corp.",
+      "version": "0.1.8",
+      "author": {
+        "name": "Xquik",
+        "url": "https://github.com/Xquik-dev"
+      },
+      "repository": "https://github.com/Xquik-dev/hermes-tweet",
+      "license": "MIT",
+      "keywords": ["hermes-agent", "hermes-plugin", "xquik", "twitter", "x", "social-media", "automation"]
     }
   ]
 }
