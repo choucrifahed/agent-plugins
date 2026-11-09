@@ -53,7 +53,7 @@ This is **idempotent** — safe to re-run. It checks for existing milestones/iss
 Run the batch sync script, passing through any arguments the user provided (e.g., `--dry-run`):
 
 ```
-node ${CLAUDE_PLUGIN_ROOT}/scripts/sync-stories-to-github.mjs $ARGUMENTS
+node ${CLAUDE_PLUGIN_ROOT}/skills/bmad-github-story-init/scripts/sync-stories-to-github.mjs $ARGUMENTS
 ```
 
 The script will:

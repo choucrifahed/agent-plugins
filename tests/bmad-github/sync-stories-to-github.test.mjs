@@ -18,7 +18,7 @@ import {
   parseDoneStories,
   parseEpics,
   resolveBmadOutputFolder,
-} from '../../bmad-github/scripts/sync-stories-to-github.mjs';
+} from '../../bmad-github/skills/bmad-github-story-init/scripts/sync-stories-to-github.mjs';
 
 // ---------------------------------------------------------------------------
 // parseEpics
