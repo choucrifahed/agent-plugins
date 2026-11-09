@@ -10,17 +10,17 @@ You are installing a GitHub Actions workflow that automatically syncs GitHub iss
 ## What the Workflow Does
 
 - **Trigger:** Runs when a GitHub issue is closed
-- **Behavior:** Looks up the closed issue in `github-issue-map.json`, verifies a merged PR exists, then marks the corresponding story as `done` in `sprint-status.yaml` and the story `.md` file. Also updates GitHub labels and checks for epic completion.
-- **Config:** Dynamically resolves the BMAD output folder at runtime by checking `_bmad/bmm/config.yaml`, then `_bmad/bmb/config.yaml`, falling back to `_bmad-output`
+- **Behavior:** Looks up the closed issue in `github-issue-map.json`, verifies that a merged PR closed it, then marks the corresponding story as `done` in `sprint-status.yaml` (and in a legacy story file's `Status:` line). Also updates GitHub labels and checks for epic completion.
+- **Config:** Installs `uv` and runs BMad's own resolver, `_bmad/scripts/resolve_config.py`, to find
+  `implementation_artifacts` in the committed config (`_bmad/config.toml` plus `_bmad/custom/config.toml`).
+- **Requirement:** the repository must commit BMad's `_bmad/` folder (v6.12+). Personal `*.user.toml` layers stay
+  gitignored and are not visible to CI.
 
 ## Steps
 
 ### 1. Read the workflow template
 
-Read the template file:
-```
-${CLAUDE_PLUGIN_ROOT}/skills/bmad-github-story-setup-ci/assets/bmad-story-sync.yml
-```
+Read the template file `./assets/bmad-story-sync.yml`.
 
 Store its full contents — it will be written verbatim with no modifications.
 
@@ -50,11 +50,12 @@ Installed .github/workflows/bmad-story-sync.yml
 
 This workflow triggers when a GitHub issue is closed and:
   - Looks up the issue in github-issue-map.json
-  - Verifies a merged PR exists for the issue
-  - Marks the story as done in sprint-status.yaml and the story .md file
+  - Verifies that a merged PR closed the issue
+  - Marks the story as done in sprint-status.yaml (and in a legacy story file)
   - Updates GitHub issue labels (adds status:done)
   - Checks if all stories in the epic are done and updates epic status
   - Commits and pushes the changes
 
-No configuration needed — the workflow reads your BMAD config at runtime.
+No configuration needed: the workflow reads your BMAD config at runtime. Commit BMad's _bmad/ folder
+so the workflow can run BMad's config resolver.
 ```

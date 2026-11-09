@@ -17,18 +17,31 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: main
+
+      # BMad runs its Python scripts through uv (required since BMad v6.11).
+      - uses: astral-sh/setup-uv@v10.3.3
 
       - name: Resolve BMAD implementation artifacts directory
         id: bmad-config
         run: |
-          if [ ! -f _bmad/config.toml ]; then
-            echo "::error::_bmad/config.toml not found at repo root."
+          if [ ! -f _bmad/scripts/resolve_config.py ]; then
+            echo "::error::_bmad/scripts/resolve_config.py not found. Commit BMad's _bmad/ folder (BMad v6.12+)."
             exit 1
           fi
-          ARTIFACTS=$(python3 -c "import tomllib; cfg=tomllib.load(open('_bmad/config.toml','rb')); print(cfg['modules']['bmm']['implementation_artifacts'].replace('{project-root}','').lstrip('/'))")
+          # BMad's own resolver merges the committed config layers:
+          # _bmad/config.toml and _bmad/custom/config.toml (user layers are gitignored).
+          ARTIFACTS=$(uv run _bmad/scripts/resolve_config.py --project-root "$GITHUB_WORKSPACE" \
+            --key modules.bmm.implementation_artifacts \
+            | jq -r '."modules.bmm.implementation_artifacts" // empty')
+          if [ -z "$ARTIFACTS" ]; then
+            echo "::error::modules.bmm.implementation_artifacts is not set in the BMad config."
+            exit 1
+          fi
+          ARTIFACTS="${ARTIFACTS//\{project-root\}/$GITHUB_WORKSPACE}"
+          ARTIFACTS="${ARTIFACTS#"$GITHUB_WORKSPACE"/}"
           echo "artifacts=$ARTIFACTS" >> "$GITHUB_OUTPUT"
           echo "Resolved artifacts directory: $ARTIFACTS"
 
@@ -55,7 +68,7 @@ jobs:
           echo "Found story $STORY_KEY for issue #$ISSUE_NUMBER"
 
           # 2. Find the full sprint key and current status
-          SPRINT_LINE=$(grep "^  ${STORY_KEY}-[a-z]" "$SPRINT_STATUS" | head -1)
+          SPRINT_LINE=$(grep "^  ${STORY_KEY}-[a-z0-9]" "$SPRINT_STATUS" | head -1)
 
           if [ -z "$SPRINT_LINE" ]; then
             echo "::warning::Story $STORY_KEY not found in sprint-status.yaml"
@@ -108,11 +121,15 @@ jobs:
 
           # 4. Update sprint-status.yaml
           sed -i "s/^  ${SPRINT_KEY}: .*$/  ${SPRINT_KEY}: done/" "$SPRINT_STATUS"
+          # Same timestamp format BMad's own sprint sync writes (MM-DD-YYYY HH:MM).
+          sed -i "s/^last_updated: .*$/last_updated: $(date -u '+%m-%d-%Y %H:%M')/" "$SPRINT_STATUS"
           echo "Updated sprint-status.yaml: $SPRINT_KEY -> done"
 
-          # 5. Update story .md file (Status line near top of file)
-          STORY_FILE=$(ls ${ARTIFACTS}/${STORY_KEY}-*.md 2>/dev/null | head -1)
-          if [ -n "$STORY_FILE" ]; then
+          # 5. Update a legacy story file (bmad-create-story format, `Status:` line).
+          # bmad-build spec files (spec-<key>-*.md) are left alone: bmad-build owns
+          # their frontmatter `status`.
+          STORY_FILE=$(ls "${ARTIFACTS}/${STORY_KEY}"-*.md 2>/dev/null | head -1)
+          if [ -n "$STORY_FILE" ] && grep -q '^Status: ' "$STORY_FILE"; then
             sed -i 's/^Status: .*/Status: done/' "$STORY_FILE"
             echo "Updated $STORY_FILE -> done"
           fi
@@ -133,7 +150,7 @@ jobs:
           for key in $(jq -r --arg e "$EPIC" \
             'to_entries[] | select(.key | startswith($e + "-")) | .key' \
             "$ISSUE_MAP"); do
-            match=$(grep "^  ${key}-[a-z]" "$SPRINT_STATUS" | head -1)
+            match=$(grep "^  ${key}-[a-z0-9]" "$SPRINT_STATUS" | head -1)
             if [ -n "$match" ]; then
               status=$(echo "$match" | sed 's/.*: //')
               if [ "$status" != "done" ]; then

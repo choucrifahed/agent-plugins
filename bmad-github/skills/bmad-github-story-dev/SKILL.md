@@ -1,24 +1,57 @@
 ---
 name: bmad-github-story-dev
-description: 'Set up a git worktree/branch (or reuse the current one) and run BMAD dev-story end-to-end: auto-commits per task, PR creation, label updates. Use when the user invokes the SD menu code in bmad help, or asks to start implementing the next ready story, or asks to begin dev on a story.'
+description: "Deprecated: `bmad-github-story-build` (Story Build, SB) is now the official way to build a story. Only use this when explicitly invoked by name"
+metadata:
+  lifecycle: shim
 ---
 
-# Story Dev: Detect Context + Sync + Verify + Git Setup + BMAD Dev-Story + PR
+# Story Dev (deprecated): Worktree + BMAD `bmad-dev-story` + PR
 
-You are developing a story. This skill handles the full lifecycle:
+> **Deprecated.** BMad v6.11 made `bmad-build` its official implementation flow and deprecated `bmad-create-story` and
+> `bmad-dev-story`. Use **Story Build (SB)** instead. This skill keeps working while BMad's deprecated
+> `bmad-dev-story` skill is installed, and goes away when BMad removes it in v7.
 
-1. Detect the current working context (main checkout vs. existing story worktree)
-2. Sync local state (light refresh)
-3. Pick the target story (from branch name, user argument, or next `status:ready` GitHub issue)
-4. Verify the story file is committed
-5. Flip the GitHub issue status label atomically (acts as the cross-agent "lock")
-6. Set up a git worktree/branch — or reuse the current one
-7. Run the BMAD dev-story operation with auto-commits per task
-8. Create a PR when development is complete
+Start by printing:
 
-This skill is safe to run from `main` **or** from inside a `story/<key>` worktree. It does not require any commits on
-`main` before branching, so it composes cleanly with orchestrators like Conductor that spawn agents in pre-created
-worktrees.
+```
+Deprecated: Story Build (SB) is now the official way to build a story. Story Dev runs only while BMad's deprecated bmad-dev-story skill is installed.
+```
+
+This skill:
+
+1. Detects the working context (main checkout vs. existing story worktree)
+2. Syncs local state
+3. Picks the target story (from the branch name, user argument, or next `status:ready` GitHub issue)
+4. Verifies the story file is committed
+5. Flips the GitHub issue status label (the cross-agent lock)
+6. Sets up a git worktree/branch, or reuses the current one
+7. Invokes BMAD's deprecated `bmad-dev-story` skill with auto-commits per task
+8. Creates a PR when development is complete
+
+---
+
+## On Activation
+
+### Load Config
+
+1. Set `{project-root}` to the output of `git rev-parse --show-toplevel`.
+2. Run:
+   ```
+   uv run {project-root}/_bmad/scripts/resolve_config.py --project-root {project-root} --key modules.bmm.planning_artifacts --key modules.bmm.implementation_artifacts --key modules.bmad-github.worktree_root
+   ```
+   If `{project-root}/_bmad/scripts/resolve_config.py` does not exist in this checkout (for example a worktree of a
+   repository that does not commit `_bmad/`), run the same command with `--project-root` set to the main checkout: the
+   parent directory of `git rev-parse --path-format=absolute --git-common-dir`.
+3. Resolve from the JSON output:
+   - `{planning_artifacts}` and `{implementation_artifacts}` — `{project-root}`-prefixed paths; resolve them against
+     the current checkout.
+   - `{worktree_root}` — optional. Default `../{repo-name}-worktrees`. Replace `{repo-name}` with the basename of the
+     main checkout, and resolve a relative value against the main checkout.
+4. If the command fails (including `uv` being unavailable), report its output and HALT:
+   ```
+   bmad-github needs BMad v6.12+ and uv. Install uv (https://docs.astral.sh/uv/), then run `npx bmad-method install`.
+   ```
+   If either `modules.bmm.*` key is missing, HALT and tell the user to install the BMad Method module (`bmm`).
 
 ---
 
@@ -27,317 +60,154 @@ worktrees.
 Run these together and record the results:
 
 ```
-git rev-parse --is-inside-work-tree
 git rev-parse --show-toplevel
 git branch --show-current
 ```
 
-Classify the context using the branch name as the primary signal:
-
 | Branch name | Context | Worktree creation in Phase 5 |
 |---|---|---|
 | `main` (or the repo's main branch) | **main checkout** | Create a new worktree |
-| `story/<key>` matching the plugin's convention | **existing story worktree** | Reuse — skip creation |
-| any other branch | **unrecognized** | STOP and ask the user |
+| `story/<key>` | **existing story worktree** | Reuse — skip creation |
+| any other branch | **unrecognized** | HALT |
 
-If the branch is unrecognized (not `main` and not `story/<key>`), print:
+If the branch is unrecognized, print and HALT:
 ```
 Current branch is `<branch>`. This skill expects either `main` or a `story/<key>` branch.
 Switch to `main` (or to the story worktree you want to continue) and re-run.
 ```
 
-Save the classification as `{{context}}` = `main` | `worktree` | `unrecognized` and the current branch as `{{branch}}`.
+Save `{context}` = `main` | `worktree`.
 
 ---
 
 ## Phase 1: Sync First
 
-Read and follow `${CLAUDE_PLUGIN_ROOT}/references/sync-first.md`.
-
-On `main` this runs the full `/story-sync` reconciliation so BMAD's `dev-story` (Phase 6) sees a current `sprint-status.yaml`. In a worktree, it does a `git fetch` and warns that `sprint-status.yaml` may lag `main`.
+- **`{context}` is `main`:** invoke the `bmad-github-story-sync` skill and let it finish, then continue here, so
+  `bmad-dev-story` sees a current `sprint-status.yaml`.
+- **`{context}` is `worktree`:** run `git fetch origin` and warn that `sprint-status.yaml` may lag `main`.
 
 ---
 
 ## Phase 2: Pick the Target Story
 
-Determine the **story key** (e.g., `1-2-bridge-interface-and-shared-type-contracts`) and **story ID** (e.g., `1-2`, the numeric prefix) using whichever source applies:
+Determine the **story key** (e.g., `1-2-bridge-interface-and-shared-type-contracts`) and **story ID** (e.g., `1-2`):
 
-### Case A — `{{context}}` is `worktree`
+### Case A — `{context}` is `worktree`
 
-The story is already chosen: extract the story key from the current branch.
 ```
-story_key = "<branch>" with the "story/" prefix removed
+story_key = branch name with the "story/" prefix removed
 story_id  = leading "<N>-<M>" segments of story_key
 ```
 
-### Case B — `{{context}}` is `main`
+### Case B — `{context}` is `main`
 
-Pick a story to work on.
-
-1. **If the user passed an explicit story key or ID** in their request (e.g., "dev 1-3" or "implement 1-3-user-prefs"), use that directly. Verify it exists in `<output_folder>/implementation-artifacts/github-issue-map.json`.
-
+1. **If the user passed an explicit story key or ID** (e.g., "dev 1-3"), use it. Verify it exists in
+   `{implementation_artifacts}/github-issue-map.json`.
 2. **Otherwise, pick the next ready story from GitHub:**
    ```
    gh issue list --label "status:ready" --state open --json number,title,labels,milestone --limit 50
    ```
+   - If the list is empty, HALT: `No story has status:ready on GitHub. Run Story Build (SB) instead.`
+   - Pick the lowest story ID (story titles start with `Story <N>.<M>:`).
+   - Recover the full story key from the story file name in `{implementation_artifacts}`.
 
-   - If the list is empty, STOP and tell the user:
-     ```
-     No story has `status:ready` on GitHub. Run Story Create (SC) to plan one.
-     ```
-   - Pick the lowest story ID by parsing titles (BMAD story titles begin with the story ID).
-   - Cross-reference with `github-issue-map.json` to recover the full story key from the chosen issue number.
-
-Save the resolved `{{story_key}}`, `{{story_id}}`, and `{{issue_number}}`.
+Save `{story_key}`, `{story_id}`, and `{issue_number}` (from `github-issue-map.json`).
 
 ---
 
 ## Phase 3: Verify Story File
 
-1. **Find the story file:**
-   Glob `<output_folder>/implementation-artifacts/{{story_key}}.md` (and `{{story_id}}-*.md` as fallback).
-   If no matching file exists, STOP:
+1. **Find the story file:** `{implementation_artifacts}/{story_key}.md`, or `{implementation_artifacts}/{story_id}-*.md`
+   as fallback. If none exists, HALT:
    ```
-   Story file not found for {{story_key}}. Start Story Create (SC) first.
-   If the story was created in a different worktree, merge that branch into `main` (or pull the latest `main`) before running Story Dev.
+   Story file not found for {story_key}. Run Story Build (SB) instead: it plans and builds the story in one run.
    ```
-
-2. **Verify the story file is committed** on the current branch:
-   ```
-   git status --porcelain <output_folder>/implementation-artifacts/
-   ```
-   If the story file is uncommitted, STOP and ask the user to commit it first.
-
-3. **Read story metadata** from the file: story title, etc.
-
-4. **Check blocking dependencies:**
-   Look for a `### Blocked By` section in the story file. If present, extract the listed story keys, then for each one query its current status via GitHub:
-   ```
-   gh issue list --json number,title,labels --search "in:title <dep_story_id>" --limit 5
-   ```
-   Identify the matching issue (title prefix), then check its labels.
-
-   - If all listed dependencies have `status:done`, continue.
-   - Otherwise STOP:
-     ```
-     === Story Blocked ===
-
-     Story {{story_id}} - {{story_title}} cannot start development.
-
-     Required stories not yet done:
-       - <dep_story_key> (current label: <dep_status>)
-
-     Complete these stories first, then re-run Story Dev (SD).
-     ```
+2. **Verify it is committed:** `git status --porcelain {implementation_artifacts}/`. If the story file is uncommitted,
+   HALT and ask the user to commit it first.
+3. **Read the story title** from the file.
+4. **Check blocking dependencies:** if the story file has a `### Blocked By` section, look up each listed story's
+   issue label on GitHub. If any is not `status:done`, HALT and list them.
 
 ---
 
-## Phase 4: Claim the Story (Atomic GitHub Label Flip)
-
-This single command serves as the cross-agent lock. If another agent already moved this story past `status:ready`, the 
-`--remove-label` is a no-op (the label isn't there), and the `--add-label status:in-progress` is idempotent.
+## Phase 4: Claim the Story
 
 ```
-gh issue edit {{issue_number}} \
+gh issue edit {issue_number} \
   --remove-label "status:backlog" \
   --remove-label "status:ready" \
   --add-label "status:in-progress"
 ```
 
-The plugin does **not** edit `sprint-status.yaml` on `main` and does **not** push a status-update commit. BMAD's own 
-`dev-story` workflow will write `sprint-status.yaml` from inside the worktree later (Step 4 of BMAD dev-story sets 
-`in-progress`; Step 9 sets `review`), and those edits ride into `main` with the eventual PR merge.
+Do not edit `sprint-status.yaml` on `main`. `bmad-dev-story` writes it inside the worktree, and the edits reach `main`
+with the PR merge.
 
 ---
 
 ## Phase 5: Git Setup
 
-### Case A — `{{context}}` is `worktree` (reuse)
+### Case A — `{context}` is `worktree`
 
-Skip worktree creation. You're already in the right place. Print:
-```
-Reusing current worktree: <git rev-parse --show-toplevel>
-Branch:                   story/{{story_key}}
-Issue:                    #{{issue_number}} — status:in-progress
-```
+Reuse it and print the worktree path, branch, and issue.
 
-Then proceed to Phase 6.
+### Case B — `{context}` is `main`
 
-### Case B — `{{context}}` is `main` (create)
+1. Check `git worktree list`, `git branch --list "story/{story_key}"`, and
+   `git ls-remote --heads origin "story/{story_key}"`:
+   - **Worktree exists** → reuse it.
+   - **Branch exists, no worktree** → `git worktree add {worktree_root}/story-{story_key} story/{story_key}`
+   - **Neither exists** → `git worktree add {worktree_root}/story-{story_key} -b story/{story_key}`
 
-#### Step 1: Resolve Worktree Root
-
-Read and follow `${CLAUDE_PLUGIN_ROOT}/references/resolve-worktree-root.md`.
-
-#### Step 2: Check for existing worktree/branch
-
-```
-git worktree list
-git branch --list "story/{{story_key}}"
-git ls-remote --heads origin "story/{{story_key}}"
-```
-
-Three sub-cases:
-
-- **Worktree exists** → reuse it. `cd` there and continue.
-- **Branch exists (locally or remotely) but no worktree** →
-  ```
-  git fetch origin "story/{{story_key}}" 2>/dev/null || true
-  git worktree add <worktree-root>/story-{{story_key}} story/{{story_key}}
-  ```
-- **Neither exists** →
-  ```
-  git worktree add <worktree-root>/story-{{story_key}} -b story/{{story_key}}
-  ```
-
-If `git worktree add -b` fails because the branch was just created by another agent (race), retry with the no-`-b` form:
-```
-git worktree add <worktree-root>/story-{{story_key}} story/{{story_key}}
-```
-
-If that also fails, the story is being worked on elsewhere. Tell the user and stop.
-
-#### Step 3: Switch into the worktree
-
-```
-cd <worktree-root>/story-{{story_key}}/
-```
-
-Print:
-```
-=== Worktree Ready ===
-
-Story:     {{story_id}} - {{story_title}}
-Branch:    story/{{story_key}}
-Worktree:  <worktree-root>/story-{{story_key}}/
-Issue:     #{{issue_number}} — status:in-progress
-```
+   If `-b` fails because another agent created the branch, retry without `-b`. If that fails too, HALT.
+2. `cd {worktree_root}/story-{story_key}` and run every later command from there.
 
 ---
 
-## Phase 6: Run BMAD dev-story
+## Phase 6: Develop the Story with `bmad-dev-story`
 
-Read and follow `${CLAUDE_PLUGIN_ROOT}/references/bmad-workflow-loader.md` with `<operation>` = `dev-story`.
+Invoke the `bmad-dev-story` skill on `{implementation_artifacts}/{story_key}.md`.
 
-BMAD's own `dev-story` workflow will edit `sprint-status.yaml` inside this worktree at Step 4 (`→ in-progress`) and 
-Step 9 (`→ review`). Those edits commit as part of the dev work and ride into `main` with the PR merge — no plugin 
-action required here.
+If `bmad-dev-story` is not available, HALT:
+```
+BMad's bmad-dev-story skill is not installed. BMad v6.12 deprecated it and leaves it out of fresh installs.
+Use Story Build (SB), which builds the story with bmad-build. To keep using Story Dev until BMad v7,
+re-run the BMad installer with --shims.
+```
 
-### Auto-Commit Instruction (Layer on top of BMAD dev-story)
+### Auto-Commit Instruction (on top of `bmad-dev-story`)
 
 **After each task is marked `[x]` in the story file and the story file is saved**, also run:
 
 ```
 git add -A
-git commit -m "feat({{story_id}}): <brief task description>"
+git commit -m "feat({story_id}): <brief task description>"
 ```
 
-Example commit messages:
-- `feat(1-2): define Bridge interface with file and theme methods`
-- `feat(1-2): add ThemeTokens and CursorInfo types`
-- `feat(1-2): create mock Bridge factory for test utilities`
-- `test(1-2): add Bridge interface contract tests`
-
-Use the appropriate conventional commit prefix:
-- `feat` for new functionality
-- `test` for test additions
-- `fix` for bug fixes during development
-- `refactor` for restructuring without behavior change
-- `chore` for build/config changes
-
-This creates **granular commits per task** — much better for PR review than a single large commit.
+Use the matching conventional commit prefix: `feat`, `test`, `fix`, `refactor`, or `chore`.
 
 ---
 
 ## Phase 7: Create PR (After All Tasks Complete)
 
-After the BMAD dev-story operation completes and the story status in the story file is `review`:
-
-### Step 1: Push the branch
-```
-git push -u origin story/{{story_key}}
-```
-
-### Step 2: Confirm the GitHub issue number
-
-You already resolved `{{issue_number}}` in Phase 2 — reuse it. (If unavailable, look it up again in `<output_folder>/implementation-artifacts/github-issue-map.json` using the story ID.)
-
-### Step 3: Build the label set
-
-The PR and issue should end up with the **same labels** (except `status:*` labels, which only live on the issue).
-
-**a) Fetch existing issue labels:**
-```
-gh issue view {{issue_number}} --json labels --jq '.labels[].name'
-```
-Filter out any labels starting with `status:` — these are managed separately.
-
-**b) Detect file-based labels from the branch diff:**
-```
-git diff --name-only main...HEAD
-```
-
-Apply these rules to the list of changed files:
-- `*.ts` or `*.tsx` → `typescript`
-- `*.js` or `*.mjs` or `*.cjs` → `javascript`
-- `*.css` or `*.scss` → `css`
-- `*.html` → `html`
-- `.github/**` → `github_actions`
-- `*.md` (excluding `<output_folder>/**`) → `documentation`
-- `package.json` or `pnpm-lock.yaml` changes → `dependencies`
-- `*.test.ts` or `*.test.js` or `__tests__/**` → `qa`
-
-**c) Merge:** Combine existing issue labels (minus `status:*`) with the file-based detected labels into a single unique set. This is the **shared label set** used for both the PR and the issue.
-
-### Step 4: Create the PR
-```
-gh pr create \
-  --title "Story {{story_id}}: {{story_title}}" \
-  --label "<comma-separated shared label set>" \
-  --body "Closes #{{issue_number}}
-
-## User Story
-<from story file>
-
-## Changes
-<summarize the implementation from the story file's task list and File List section>
-
-## Test Coverage
-<summarize tests written>
+When `bmad-dev-story` completes and the story file's `Status:` is `review`, invoke the `bmad-github-story-open-pr`
+skill with `{story_id}`, `{story_key}`, `{story_title}`, `{issue_number}`, and `{record_file}` = the story file.
 
 ---
-_Developed via BMAD workflow_"
-```
 
-The `Closes #{{issue_number}}` in the PR body means **merging the PR will auto-close the GitHub issue** — which triggers the `bmad-story-sync` GitHub Actions workflow to mark the story `done` in `sprint-status.yaml` on `main`.
-
-### Step 5: Sync labels to the issue
-
-Ensure the issue has the same shared label set (adds any new file-based labels that weren't on the issue yet):
-```
-gh issue edit {{issue_number}} --add-label "<comma-separated shared label set>"
-```
-
-### Step 6: Update GitHub issue status label
-```
-gh issue edit {{issue_number}} --remove-label "status:in-progress" --add-label "status:review"
-```
-
-### Step 7: Report
+## Phase 8: Report
 
 ```
 === Story Development Complete ===
 
-Story:   {{story_id}} - {{story_title}}
-Branch:  story/{{story_key}}
+Story:   {story_id} - {story_title}
+Branch:  story/{story_key}
 PR:      <pr_url>
-Issue:   #{{issue_number}}
-Status:  review
-Labels:  <shared label set>
-
-Commits: <count> commits created during development
+Issue:   #{issue_number} — status:review
 
 Next steps:
-  1. Start Story Review (SR) in this worktree for code review
-  2. Or, the user can review the PR directly on GitHub
+  1. Optional: run Story Review (SR) in this worktree for a code review pass
+  2. Review and merge the PR on GitHub
+  3. Run Story Sync (SY) from the main checkout
+
+Story Dev is deprecated: use Story Build (SB) for the next story.
 ```
