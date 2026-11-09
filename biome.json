@@ -1,7 +1,7 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.4.2/schema.json",
   "files": {
-    "includes": ["bmad-github/scripts/**/*.mjs", "tests/**/*.mjs"]
+    "includes": ["bmad-github/skills/**/*.mjs", "tests/**/*.mjs"]
   },
   "linter": {
     "enabled": true

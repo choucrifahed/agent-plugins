@@ -19,7 +19,7 @@ You are installing a GitHub Actions workflow that automatically syncs GitHub iss
 
 Read the template file:
 ```
-${CLAUDE_PLUGIN_ROOT}/references/bmad-story-sync.yml
+${CLAUDE_PLUGIN_ROOT}/skills/bmad-github-story-setup-ci/assets/bmad-story-sync.yml
 ```
 
 Store its full contents — it will be written verbatim with no modifications.

@@ -55,7 +55,7 @@ The version must be consistent across all three files:
 |------|-------|
 | `.claude-plugin/marketplace.json` | `plugins[0].version` |
 | `bmad-github/.claude-plugin/plugin.json` | `version` |
-| `bmad-github/module.yaml` | `version` |
+| `bmad-github/skills/module.yaml` | `version` |
 
 When releasing a new version, update all three files to the same semver value.
 
