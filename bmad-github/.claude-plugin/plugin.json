@@ -1,6 +1,9 @@
 {
   "name": "bmad-github",
-  "version": "1.1.2",
+  "version": "2.0.0",
   "description": "BMAD + GitHub story workflow with git worktrees for parallel agent development",
+  "author": {
+    "name": "Choucri Fahed"
+  },
   "keywords": ["bmad", "github", "stories", "worktrees", "project-management", "issues", "milestones", "labels"]
 }

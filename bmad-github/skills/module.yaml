@@ -1,10 +1,10 @@
 code: bmad-github
 name: "GitHub Story Workflow"
-description: "BMAD + GitHub story lifecycle: init, create, dev, review, sync, setup-ci. Provides 6 implementation-phase skills that bridge BMAD workflows with GitHub issues, milestones, labels, PRs, and worktrees for parallel agent development."
-version: "1.1.2"
+description: "BMAD + GitHub story lifecycle on top of BMad's bmad-build: sync epics to GitHub issues and milestones, build each story in its own git worktree, open a PR that closes the issue, and mark stories done only after the PR is merged."
+version: "2.0.0"
 default_selected: false
 
 worktree_root:
-  prompt: "Where should git worktrees be created? (Used by Story Dev to run multiple agents in parallel without colliding.)"
+  prompt: "Where should git worktrees be created? (Used by Story Build to run multiple agents in parallel without colliding.)"
   default: "../{repo-name}-worktrees"
   result: "{value}"

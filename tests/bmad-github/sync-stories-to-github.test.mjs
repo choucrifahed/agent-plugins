@@ -17,7 +17,10 @@ import {
   gh,
   parseDoneStories,
   parseEpics,
-  resolveBmadOutputFolder,
+  parseFrontmatterStatus,
+  resolveBmadPaths,
+  runResolveConfig,
+  toAbsolutePath,
 } from '../../bmad-github/skills/bmad-github-story-init/scripts/sync-stories-to-github.mjs';
 
 // ---------------------------------------------------------------------------
@@ -258,6 +261,21 @@ describe('parseDoneStories', () => {
     expect(parseDoneStories('').size).toBe(0);
   });
 
+  it('ignores retrospective action_items entries (BMad 6.9+)', () => {
+    const yaml = [
+      'development_status:',
+      '  epic-1: done',
+      '  1-1-setup-project: done',
+      '  1-2-add-auth: review',
+      'action_items:',
+      '  - epic: 1',
+      '    action: "Add error-handling review to the checklist"',
+      '    owner: "Charlie"',
+      '    status: done',
+    ].join('\n');
+    expect(parseDoneStories(yaml)).toEqual(new Set(['1-1']));
+  });
+
   it('requires leading whitespace (rejects top-level lines)', () => {
     const done = parseDoneStories('1-1-setup: done');
     expect(done.size).toBe(0);
@@ -484,13 +502,50 @@ describe('gh', () => {
 });
 
 // ---------------------------------------------------------------------------
-// resolveBmadOutputFolder
+// BMad config resolution
 // ---------------------------------------------------------------------------
 
-describe('resolveBmadOutputFolder', () => {
+describe('toAbsolutePath', () => {
+  it('substitutes {project-root}', () => {
+    expect(toAbsolutePath('{project-root}/_bmad-output/planning-artifacts', '/repo')).toBe(
+      '/repo/_bmad-output/planning-artifacts',
+    );
+  });
+
+  it('joins relative values onto the root', () => {
+    expect(toAbsolutePath('docs/artifacts', '/repo')).toBe('/repo/docs/artifacts');
+  });
+
+  it('keeps absolute values', () => {
+    expect(toAbsolutePath('/elsewhere/artifacts', '/repo')).toBe('/elsewhere/artifacts');
+  });
+});
+
+describe('resolveBmadPaths', () => {
+  it('resolves both artifact folders from the merged config', () => {
+    const resolveConfig = () => ({
+      'modules.bmm.planning_artifacts': '{project-root}/_bmad-output/planning-artifacts',
+      'modules.bmm.implementation_artifacts': '{project-root}/custom/impl',
+    });
+    expect(resolveBmadPaths('/repo', { resolveConfig })).toEqual({
+      planningArtifacts: '/repo/_bmad-output/planning-artifacts',
+      implementationArtifacts: '/repo/custom/impl',
+    });
+  });
+
+  it('throws when the bmm module is not configured', () => {
+    const resolveConfig = () => ({ 'modules.bmm.planning_artifacts': '{project-root}/plan' });
+    expect(() => resolveBmadPaths('/repo', { resolveConfig })).toThrow(
+      /modules\.bmm\.implementation_artifacts/,
+    );
+  });
+});
+
+describe('runResolveConfig', () => {
   let tempDir;
 
   beforeEach(() => {
+    vi.clearAllMocks();
     tempDir = mkdtempSync(join(tmpdir(), 'bmad-test-'));
   });
 
@@ -498,47 +553,66 @@ describe('resolveBmadOutputFolder', () => {
     rmSync(tempDir, { recursive: true, force: true });
   });
 
-  it('returns default when no config file exists', () => {
-    const result = resolveBmadOutputFolder(tempDir);
-    expect(result).toBe(join(tempDir, '_bmad-output'));
+  function installResolver() {
+    mkdirSync(join(tempDir, '_bmad/scripts'), { recursive: true });
+    writeFileSync(join(tempDir, '_bmad/scripts/resolve_config.py'), '');
+  }
+
+  it('throws a clear error when BMad is not installed', () => {
+    expect(() => runResolveConfig(tempDir)).toThrow(/resolve_config\.py/);
+    expect(execFileSync).not.toHaveBeenCalled();
   });
 
-  it('reads output_folder from config.yaml', () => {
-    mkdirSync(join(tempDir, '_bmad/bmm'), { recursive: true });
-    writeFileSync(join(tempDir, '_bmad/bmm/config.yaml'), 'output_folder: docs\n');
-    const result = resolveBmadOutputFolder(tempDir);
-    expect(result).toBe(join(tempDir, 'docs'));
-  });
-
-  it('resolves {project-root} placeholder', () => {
-    mkdirSync(join(tempDir, '_bmad/bmm'), { recursive: true });
-    writeFileSync(
-      join(tempDir, '_bmad/bmm/config.yaml'),
-      'output_folder: "{project-root}/custom-output"\n',
+  it('runs BMad resolver through uv with the needed keys', () => {
+    installResolver();
+    execFileSync.mockReturnValue('{"modules.bmm.planning_artifacts": "x"}');
+    expect(runResolveConfig(tempDir)).toEqual({ 'modules.bmm.planning_artifacts': 'x' });
+    expect(execFileSync).toHaveBeenCalledWith(
+      'uv',
+      [
+        'run',
+        join(tempDir, '_bmad/scripts/resolve_config.py'),
+        '--project-root',
+        tempDir,
+        '--key',
+        'modules.bmm.planning_artifacts',
+        '--key',
+        'modules.bmm.implementation_artifacts',
+      ],
+      expect.any(Object),
     );
-    const result = resolveBmadOutputFolder(tempDir);
-    expect(result).toBe(join(tempDir, 'custom-output'));
   });
 
-  it('handles quoted values', () => {
-    mkdirSync(join(tempDir, '_bmad/bmm'), { recursive: true });
-    writeFileSync(join(tempDir, '_bmad/bmm/config.yaml'), "output_folder: 'my-output'\n");
-    const result = resolveBmadOutputFolder(tempDir);
-    expect(result).toBe(join(tempDir, 'my-output'));
+  it('explains how to install uv when it is missing', () => {
+    installResolver();
+    execFileSync.mockImplementation(() => {
+      throw Object.assign(new Error('spawn uv ENOENT'), { code: 'ENOENT' });
+    });
+    expect(() => runResolveConfig(tempDir)).toThrow(/uv` is not installed/);
   });
 
-  it('returns default when config exists but has no output_folder key', () => {
-    mkdirSync(join(tempDir, '_bmad/bmm'), { recursive: true });
-    writeFileSync(join(tempDir, '_bmad/bmm/config.yaml'), 'user_name: test\n');
-    const result = resolveBmadOutputFolder(tempDir);
-    expect(result).toBe(join(tempDir, '_bmad-output'));
+  it('surfaces resolver failures', () => {
+    installResolver();
+    execFileSync.mockImplementation(() => {
+      throw Object.assign(new Error('exit 1'), { stderr: 'error: required config file not found' });
+    });
+    expect(() => runResolveConfig(tempDir)).toThrow(/required config file not found/);
+  });
+});
+
+describe('parseFrontmatterStatus', () => {
+  it('reads a quoted or bare status', () => {
+    expect(parseFrontmatterStatus("---\nstatus: 'draft'\n---\n# Epics")).toBe('draft');
+    expect(parseFrontmatterStatus('---\ntitle: x\nstatus: final\n---\n')).toBe('final');
   });
 
-  it('handles absolute path in output_folder', () => {
-    mkdirSync(join(tempDir, '_bmad/bmm'), { recursive: true });
-    writeFileSync(join(tempDir, '_bmad/bmm/config.yaml'), 'output_folder: /absolute/path\n');
-    const result = resolveBmadOutputFolder(tempDir);
-    expect(result).toBe('/absolute/path');
+  it('ignores trailing comments', () => {
+    expect(parseFrontmatterStatus('---\nstatus: draft # draft | final\n---\n')).toBe('draft');
+  });
+
+  it('returns null without frontmatter or status', () => {
+    expect(parseFrontmatterStatus('# Epics\nstatus: draft')).toBeNull();
+    expect(parseFrontmatterStatus('---\ntitle: x\n---\n')).toBeNull();
   });
 });
 

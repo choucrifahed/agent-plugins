@@ -2,7 +2,8 @@
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org/) (for scripts and tests)
+- [Node.js](https://nodejs.org/) v22.12+ (for scripts and tests; Vitest 5 requires it, CI runs Node 26)
+- [`uv`](https://docs.astral.sh/uv/) (to run BMad's skill validator and to try the module in a BMad project)
 ## Setup
 
 ```bash
@@ -25,6 +26,7 @@ Tests live in `tests/` mirroring the plugin structure:
 tests/
   bmad-github/
     sync-stories-to-github.test.mjs   # Tests for the batch sync script
+    skills.test.mjs                   # Skill layout, no duplicated files, module-help.csv, versions
 ```
 
 Run a specific test file:
@@ -32,10 +34,28 @@ Run a specific test file:
 npx vitest run tests/bmad-github/sync-stories-to-github.test.mjs
 ```
 
+### BMad skill validator
+
+BMad ships a deterministic skill validator. Run it against each skill before a release:
+
+```bash
+npm pack bmad-method@<version> && tar xzf bmad-method-<version>.tgz
+for d in bmad-github/skills/*/; do uv run --python 3.11 package/tools/validate_skills.py --strict "$d"; done
+```
+
+### Try the module in a BMad project
+
+```bash
+npx bmad-method install --directory /tmp/demo --modules bmm \
+  --custom-source "$PWD/bmad-github/skills" --tools claude-code --yes
+```
+
+Add `--shims` to also install the deprecated skills (`bmad-github-story-create`, `bmad-github-story-dev`).
+
 ## Linting & Formatting
 
 This project uses [Biome](https://biomejs.dev/) for linting and formatting. It only checks
-JavaScript/ESM files in `bmad-github/scripts/` and `tests/`.
+JavaScript/ESM files under `bmad-github/skills/` and `tests/`.
 
 Configuration: `biome.json`
 - Indent: 2 spaces
@@ -57,7 +77,7 @@ The version must be consistent across all three files:
 | `bmad-github/.claude-plugin/plugin.json` | `version` |
 | `bmad-github/skills/module.yaml` | `version` |
 
-When releasing a new version, update all three files to the same semver value.
+When releasing a new version, update all three files to the same semver value. `skills.test.mjs` checks that they match.
 
 ## Project Structure
 
@@ -65,28 +85,26 @@ When releasing a new version, update all three files to the same semver value.
 agent-plugins/
 ├── .claude-plugin/
 │   └── marketplace.json          # Marketplace manifest (plugin registry)
-├── bmad-github/                  # The bmad-github plugin (also a BMAD v6.6+ module)
+├── bmad-github/                  # The bmad-github plugin (also a BMAD module)
 │   ├── .claude-plugin/
 │   │   └── plugin.json           # Claude Code plugin manifest
-│   ├── module.yaml               # BMAD module manifest
-│   ├── module-help.csv           # BMAD help entries (SI/SC/SD/SR/SS/SCI)
-│   ├── skills/                   # Six story-lifecycle skills (canonical content)
-│   │   ├── bmad-github-story-init/SKILL.md
-│   │   ├── bmad-github-story-create/SKILL.md
-│   │   ├── bmad-github-story-dev/SKILL.md
-│   │   ├── bmad-github-story-review/SKILL.md
-│   │   ├── bmad-github-story-sync/SKILL.md
-│   │   └── bmad-github-story-setup-ci/SKILL.md
-│   ├── references/               # Shared instructions (workflow loader, sync helper, etc.)
-│   ├── hooks/                    # Event hooks
-│   │   ├── hooks.json            # Hook configuration
-│   │   └── scripts/
-│   │       └── session-start.sh  # Injects BMAD output folder convention
-│   └── scripts/
-│       └── sync-stories-to-github.mjs  # Batch sync script (Node.js)
+│   └── skills/                   # Claude Code skills dir AND the BMAD module source (--custom-source)
+│       ├── module.yaml           # BMAD module manifest
+│       ├── module-help.csv       # BMAD help entries (SI/SB/SPR/SR/SY/SCI)
+│       ├── bmad-github-story-init/
+│       │   ├── SKILL.md
+│       │   └── scripts/sync-stories-to-github.mjs   # Batch sync script (Node.js)
+│       ├── bmad-github-story-build/SKILL.md
+│       ├── bmad-github-story-open-pr/SKILL.md       # push + PR, invoked by Story Build and Story Dev
+│       ├── bmad-github-story-review/SKILL.md
+│       ├── bmad-github-story-sync/SKILL.md
+│       ├── bmad-github-story-setup-ci/
+│       │   ├── SKILL.md
+│       │   └── assets/bmad-story-sync.yml           # GitHub Actions template
+│       ├── bmad-github-story-create/SKILL.md        # deprecated (lifecycle: shim)
+│       └── bmad-github-story-dev/SKILL.md           # deprecated (lifecycle: shim)
 ├── tests/
 │   └── bmad-github/
-│       └── sync-stories-to-github.test.mjs
 ├── package.json
 ├── biome.json
 ├── README.md                     # User-facing documentation

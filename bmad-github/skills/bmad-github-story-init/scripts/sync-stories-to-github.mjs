@@ -8,17 +8,21 @@
  *
  * Prerequisites:
  *   - `gh` CLI installed and authenticated
+ *   - `uv` installed (BMad runs its Python scripts through `uv run`)
+ *   - BMad v6.12+ installed in the project (`_bmad/scripts/resolve_config.py`)
  *   - Run from the repository root
  *
  * Idempotent: safe to re-run. Checks for existing milestones/issues before creating.
- * Saves mapping to <output_folder>/implementation-artifacts/github-issue-map.json
+ * Saves mapping to {implementation_artifacts}/github-issue-map.json
  *
- * Reads BMAD's output_folder from _bmad/bmm/config.yaml (falls back to '_bmad-output').
+ * Reads BMad's `planning_artifacts` and `implementation_artifacts` through BMad's own
+ * config resolver, which merges all four central config layers (including
+ * `_bmad/custom/config.toml` and `_bmad/custom/config.user.toml` overrides).
  */
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const DRY_RUN = process.argv.includes('--dry-run');
@@ -26,35 +30,83 @@ const ROOT = process.cwd();
 
 // --- BMAD config resolution -----------------------------------------------
 
-const DEFAULT_OUTPUT_FOLDER = '_bmad-output';
+const CONFIG_KEYS = {
+  planningArtifacts: 'modules.bmm.planning_artifacts',
+  implementationArtifacts: 'modules.bmm.implementation_artifacts',
+};
 
 /**
- * Read BMAD's output_folder from the BMM module config.
- * Checks _bmad/bmm/config.yaml for an output_folder key.
- * Falls back to '_bmad-output' if not found.
+ * Run BMad's config resolver and return its JSON output (dotted key -> value).
+ * Keys missing from the merged config are absent from the output.
  */
-function resolveBmadOutputFolder(root) {
-  const configPath = join(root, '_bmad/bmm/config.yaml');
-  try {
-    const content = readFileSync(configPath, 'utf-8');
-    // Match "output_folder: <value>" — handles quoted and unquoted values,
-    // and resolves {project-root} placeholder to the actual root.
-    const match = content.match(/^output_folder:\s*['"]?(.+?)['"]?\s*$/m);
-    if (match) {
-      const raw = match[1].replace(/\{project-root\}/g, root);
-      // If the resolved value is absolute, use it directly; otherwise join with root
-      return raw.startsWith('/') ? raw : join(root, raw);
-    }
-  } catch {
-    // Config file doesn't exist or isn't readable — use default
+function runResolveConfig(root) {
+  const script = join(root, '_bmad/scripts/resolve_config.py');
+  if (!existsSync(script)) {
+    throw new Error(
+      `BMad config resolver not found at ${script}.\n` +
+        '  Install or update BMad (v6.12+): npx bmad-method install',
+    );
   }
-  return join(root, DEFAULT_OUTPUT_FOLDER);
+  const args = ['run', script, '--project-root', root];
+  for (const key of Object.values(CONFIG_KEYS)) args.push('--key', key);
+  let out;
+  try {
+    out = execFileSync('uv', args, { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] });
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      throw new Error(
+        '`uv` is not installed. BMad runs its Python scripts through `uv run`.\n' +
+          '  Install it from https://docs.astral.sh/uv/',
+      );
+    }
+    throw new Error(`BMad config resolver failed:\n${err.stderr || err.message}`);
+  }
+  try {
+    return JSON.parse(out);
+  } catch (parseErr) {
+    throw new Error(`BMad config resolver returned invalid JSON: ${parseErr.message}`);
+  }
 }
 
-const OUTPUT_FOLDER = resolveBmadOutputFolder(ROOT);
-const EPICS_PATH = join(OUTPUT_FOLDER, 'planning-artifacts/epics.md');
-const SPRINT_STATUS_PATH = join(OUTPUT_FOLDER, 'implementation-artifacts/sprint-status.yaml');
-const MAP_PATH = join(OUTPUT_FOLDER, 'implementation-artifacts/github-issue-map.json');
+/** Resolve a BMad config path value (may contain `{project-root}`) to an absolute path. */
+function toAbsolutePath(value, root) {
+  const raw = String(value).replaceAll('{project-root}', root);
+  return isAbsolute(raw) ? raw : join(root, raw);
+}
+
+/**
+ * Resolve BMad's artifact folders.
+ * @returns {{ planningArtifacts: string, implementationArtifacts: string }}
+ */
+function resolveBmadPaths(root, { resolveConfig = runResolveConfig } = {}) {
+  const config = resolveConfig(root);
+  const paths = {};
+  for (const [name, key] of Object.entries(CONFIG_KEYS)) {
+    const value = config[key];
+    if (typeof value !== 'string' || value.trim() === '') {
+      throw new Error(
+        `BMad config key \`${key}\` is not set.\n` +
+          '  Install the BMad Method module (bmm): npx bmad-method install --modules bmm',
+      );
+    }
+    paths[name] = toAbsolutePath(value, root);
+  }
+  return paths;
+}
+
+/** Read the `status` value from a Markdown file's YAML frontmatter, or null. */
+function parseFrontmatterStatus(content) {
+  const match = content.replaceAll('\r\n', '\n').match(/^---\n([\s\S]*?)\n---/);
+  if (!match) return null;
+  const status = match[1].match(/^status:\s*['"]?([^'"\n#]+?)['"]?\s*(?:#.*)?$/m);
+  return status ? status[1].trim() : null;
+}
+
+// Paths are resolved lazily in main() so that importing this module (tests) never
+// shells out to BMad.
+let EPICS_PATH;
+let SPRINT_STATUS_PATH;
+let MAP_PATH;
 
 // --- Helpers -----------------------------------------------------------
 
@@ -526,8 +578,7 @@ function createIssues(stories, doneStories, milestoneMap) {
 
 function saveIssueMap(issueMap) {
   console.log('\n--- Saving issue map ---');
-  const dir = join(OUTPUT_FOLDER, 'implementation-artifacts');
-  mkdirSync(dir, { recursive: true });
+  mkdirSync(dirname(MAP_PATH), { recursive: true });
 
   // Atomic write: write to .tmp then rename
   const content = `${JSON.stringify(issueMap, null, 2)}\n`;
@@ -567,7 +618,7 @@ function readEpicsFile() {
   } catch (err) {
     if (err.code === 'ENOENT') {
       console.error(`Error: epics.md not found at ${EPICS_PATH}`);
-      console.error('  Run the BMAD planning workflow to generate epics.md first.');
+      console.error('  Run the bmad-create-epics-and-stories skill to generate epics.md first.');
     } else {
       console.error(`Error reading epics.md: ${err.message}`);
     }
@@ -581,7 +632,24 @@ function main() {
 
   verifyGhCli();
 
-  const { epics, stories } = parseEpics(readEpicsFile());
+  let bmadPaths;
+  try {
+    bmadPaths = resolveBmadPaths(ROOT);
+  } catch (err) {
+    console.error(`Error: ${err.message}`);
+    process.exit(1);
+  }
+  EPICS_PATH = join(bmadPaths.planningArtifacts, 'epics.md');
+  SPRINT_STATUS_PATH = join(bmadPaths.implementationArtifacts, 'sprint-status.yaml');
+  MAP_PATH = join(bmadPaths.implementationArtifacts, 'github-issue-map.json');
+
+  const epicsContent = readEpicsFile();
+  if (parseFrontmatterStatus(epicsContent) === 'draft') {
+    console.warn('Warning: epics.md has `status: draft` — BMad has not finished validating it.');
+    console.warn('  Finish bmad-create-epics-and-stories before relying on these issues.');
+  }
+
+  const { epics, stories } = parseEpics(epicsContent);
   if (epics.length === 0) {
     console.error('Error: No epics found in epics.md.');
     console.error('  Expected format: "## Epic N: Title"');
@@ -640,12 +708,15 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
 }
 
 export {
-  parseEpics,
-  parseDoneStories,
-  classifyStory,
   buildIssueBody,
-  gh,
-  resolveBmadOutputFolder,
-  fetchMilestones,
   buildMilestoneMap,
+  classifyStory,
+  fetchMilestones,
+  gh,
+  parseDoneStories,
+  parseEpics,
+  parseFrontmatterStatus,
+  resolveBmadPaths,
+  runResolveConfig,
+  toAbsolutePath,
 };
